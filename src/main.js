@@ -17,6 +17,7 @@ import { buildLake } from './world/lake.js';
 import { buildVegetation, updateLOD } from './world/vegetation.js';
 import { buildProps } from './world/props.js';
 import { buildLights } from './world/lights.js';
+import { buildStadium, buildSchool } from './world/campus.js';
 import { loadModelSet } from './world/models.js';
 import { buildLighting, PRESET_ORDER } from './world/lighting.js';
 import { CarModel } from './car/model.js';
@@ -72,6 +73,7 @@ async function boot() {
     ['Raising the 20 ft boundary wall…', () => buildWall(ctx)],
     ['Generating 1,698 buildings…', () => buildBuildings(ctx)],
     ['Temple, school, stadium, agro plant…', () => buildAmenities(ctx)],
+    ['Cricket stadium and school campus…', () => { buildStadium(ctx); buildSchool(ctx); }],
     ['Filling the lake…', () => buildLake(ctx)],
     ['Planting trees, hedges and crops…', () => buildVegetation(ctx)],
     ['Parking cars, planting flowers…', () => buildProps(ctx)],
@@ -82,7 +84,7 @@ async function boot() {
   for (let i = 0; i < steps.length; i++) { ui.setLoading(0.15 + (i / steps.length) * 0.8, steps[i][0]); await nextFrame(); steps[i][1](); }
   console.log(`[world] built in ${Math.round(performance.now() - t0)} ms, colliders ${colliders.list.length}, trees ${ctx.treeCount}, crop shrubs ${ctx.shrubCount}`);
   // Paved (non-slowing) areas besides roads.
-  ctx.pavedRects = [...world.L.commercial, ...world.L.amenities.filter((a) => ['parking', 'agro', 'fire-station', 'wtp', 'school'].includes(a.id)), ...world.L.parks.map((p) => ({ x: p.x, y: p.y + p.h / 2 - 2, w: p.w, h: 4 }))];
+  ctx.pavedRects = [...world.L.commercial, ...world.L.amenities.filter((a) => ['parking', 'agro', 'fire-station', 'wtp', 'school', 'stadium'].includes(a.id)), ...world.L.parks.map((p) => ({ x: p.x, y: p.y + p.h / 2 - 2, w: p.w, h: 4 }))];
 
   const input = new Input(); input.invertSteer = settings.get('invertSteer');
   const car = new CarModel(world, colliders, ctx);

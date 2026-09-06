@@ -83,86 +83,7 @@ export function buildAmenities(ctx) {
     for (const [sx, sz] of [[-33, -33], [33, -33], [-33, 33], [33, 33]]) sand.push(cyl(0.45, 0.55, 4, 10, SAND2, { x: cx + sx, z: cz + sz, y: 2.5 + 2 }));
     solid(cx - 35, cz - 35, cx + 35, cz + 35, 'amenity', plotOf('temple'));
   }
-  // School: U-shaped two-storey block around a courtyard, playfield east, boundary wall.
-  { const a = A.school; const p = plotOf('school');
-    const bx = a.x + 12, bz = a.y + 12;
-    const blocks = [[bx, bz, 130, 14], [bx, bz, 14, 150], [bx, bz + 136, 130, 14]];
-    for (const [x, z, w, d] of blocks) {
-      plaster.push(box(w, 8, d, 0xf4ead8, { x: x + w / 2, z: z + d / 2, y: 4.2 })); plaster.push(box(w + 0.6, 0.35, d + 0.6, 0xe0d6c4, { x: x + w / 2, z: z + d / 2, y: 4.4 }));
-      plaster.push(box(w + 0.6, 0.4, d + 0.6, 0xe0d6c4, { x: x + w / 2, z: z + d / 2, y: 8.4 }));
-      const along = w > d;
-      for (let t = 4; t < (along ? w : d) - 3; t += 5) for (const h of [2.2, 6.2]) {
-        if (along) { glass.push(box(2.6, 1.8, 0.1, 0x223447, { x: x + t, z: z + d + 0.05, y: h })); glass.push(box(2.6, 1.8, 0.1, 0x223447, { x: x + t, z: z - 0.05, y: h })); }
-        else { glass.push(box(0.1, 1.8, 2.6, 0x223447, { x: x + w + 0.05, z: z + t, y: h })); glass.push(box(0.1, 1.8, 2.6, 0x223447, { x: x - 0.05, z: z + t, y: h })); }
-      }
-      solid(x, z, x + w, z + d, 'amenity', p);
-    }
-    for (let x = bx + 20; x < bx + 130; x += 6) plaster.push(cyl(0.3, 0.3, 4, 8, 0xf4ead8, { x, z: bz + 16, y: 2 }));
-    plaster.push(box(114, 0.3, 4, 0xe0d6c4, { x: bx + 75, z: bz + 16, y: 4.1 }));
-    plaster.push(box(a.w, 1.2, 0.3, 0xe0d6c4, { x: a.x + a.w / 2, z: a.y, y: 0.6 })); plaster.push(box(a.w, 1.2, 0.3, 0xe0d6c4, { x: a.x + a.w / 2, z: a.y + a.h, y: 0.6 }));
-    plaster.push(box(0.3, 1.2, a.h, 0xe0d6c4, { x: a.x + a.w, z: a.y + a.h / 2, y: 0.6 }));
-    // Playfield lines
-    const fx = a.x + a.w * 0.6, fz = a.y + 30; track.push(patchGeo(fx, fz, 90, 0.4, 1, 0.05)); track.push(patchGeo(fx, fz + 120, 90, 0.4, 1, 0.05)); track.push(patchGeo(fx, fz, 0.4, 120, 1, 0.05)); track.push(patchGeo(fx + 90, fz, 0.4, 120, 1, 0.05));
-    // Flag pole
-    metal.push(cyl(0.1, 0.12, 14, 8, 0xdddddd, { x: bx + 75, z: bz + 40, y: 7 }));
-  }
-  // Stadium: twelve stepped seat rows in two tiers, a walkway, back wall, cantilevered roof canopy,
-  // four floodlight masts with lamp arrays, eight-lane track, marked pitch with goals, corner entrance gates.
-  { const a = A.stadium; const p = plotOf('stadium'); const cx = a.x + a.w / 2, cz = a.y + a.h / 2;
-    // The bowl (track + 12 seat rows + walkway + back wall ~ 18 m) must stay inside the 200 x 210 m lot with a 6 m margin.
-    const rx = a.w / 2 - 24, rz = a.h / 2 - 24;
-    track.push(patchGeo(a.x + 6, a.y + 6, a.w - 12, a.h - 12, 4, 0.04));
-    const inner = new THREE.Mesh(new THREE.CircleGeometry(1, 48), stdMat(T, T.lawn)); inner.scale.set(rx - 11, rz - 11, 1); inner.rotation.x = -Math.PI / 2; inner.position.set(cx, 0.06, cz); inner.receiveShadow = true; scene.add(inner);
-    const bandMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
-    const addBand = (r0, r1, y0, y1, col, seg = 72) => { const m = new THREE.Mesh(ellipseBand(cx, cz, rx + r0, rz + r0, rx + r1, rz + r1, y0, y1, col, seg), bandMat); m.castShadow = true; m.receiveShadow = true; scene.add(m); };
-    // Lane lines (8 lanes) and a start line.
-    for (let i = 0; i <= 8; i++) addBand(-10.4 + i * 1.2, -10.3 + i * 1.2, 0.055, 0.055, 0xf4f4ee, 96);
-    // Seat rows: tier 1 (6 steps), walkway, tier 2 (6 steps).
-    let r = 0, y = 0.3;
-    addBand(-0.4, 0, 0, y, 0x9aa3ad);
-    const seatCols = [0x2c5f9e, 0xd9dde2, 0x2c5f9e, 0xc9a227];
-    for (let i = 0; i < 12; i++) {
-      if (i === 6) { addBand(r, r + 3, y, y, 0x8f979f); r += 3; }
-      addBand(r, r + 1.15, y, y, seatCols[i % seatCols.length]); r += 1.15;
-      addBand(r, r, y, y + 0.55, 0x7d858e); y += 0.55;
-    }
-    addBand(r, r + 1.2, y, y, 0x8f979f); r += 1.2;
-    addBand(r, r + 0.5, y, y + 2.6, 0x8f979f); addBand(r + 0.5, r + 0.5, 0, y + 2.6, 0xd9d5cc); // back wall (light concrete outside)
-    const yTop = y + 2.6;
-    // Roof canopy: sloped band from the back wall out over the seats, with a fascia and support columns.
-    addBand(r + 1.2, 2.5, yTop + 3.2, yTop + 1.4, 0xe9ecef);
-    addBand(2.5, 2.5, yTop + 1.4, yTop + 0.7, 0xc9a227);
-    addBand(r + 0.9, r + 1.2, yTop, yTop + 3.4, 0x5d6775);
-    for (let i = 0; i < 24; i++) { const ang = (i / 24) * Math.PI * 2; const x = cx + Math.cos(ang) * (rx + r + 1.0), z = cz + Math.sin(ang) * (rz + r + 1.0); metal.push(cyl(0.3, 0.35, yTop + 3.2, 8, 0x8b949e, { x, z, y: (yTop + 3.2) / 2 })); }
-    for (let i = 0; i < 16; i++) { const a0 = (i / 16) * Math.PI * 2, a1 = ((i + 1) / 16) * Math.PI * 2; const xs = [], zs = []; for (const ang of [a0, (a0 + a1) / 2, a1]) for (const rr of [-0.4, r + 1.4]) { xs.push(cx + Math.cos(ang) * (rx + rr)); zs.push(cz + Math.sin(ang) * (rz + rr)); } solid(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), 'amenity', p); }
-    // Pitch markings: centre circle, halfway line, penalty boxes, goals.
-    const pitchW = (rx - 14) * 2, pitchH = (rz - 16) * 2;
-    track.push(patchGeo(cx - pitchW / 2, cz - pitchH / 2, pitchW, 0.15, 1, 0.065)); track.push(patchGeo(cx - pitchW / 2, cz + pitchH / 2, pitchW, 0.15, 1, 0.065));
-    track.push(patchGeo(cx - pitchW / 2, cz - pitchH / 2, 0.15, pitchH, 1, 0.065)); track.push(patchGeo(cx + pitchW / 2, cz - pitchH / 2, 0.15, pitchH, 1, 0.065)); track.push(patchGeo(cx - 0.075, cz - pitchH / 2, 0.15, pitchH, 1, 0.065));
-    for (const s of [-1, 1]) { const bx = s < 0 ? cx - pitchW / 2 : cx + pitchW / 2 - 16.5; track.push(patchGeo(bx, cz - 20, 16.5, 0.15, 1, 0.065)); track.push(patchGeo(bx, cz + 20, 16.5, 0.15, 1, 0.065)); track.push(patchGeo(s < 0 ? bx + 16.5 : bx, cz - 20, 0.15, 40, 1, 0.065));
-      const gx = s < 0 ? cx - pitchW / 2 : cx + pitchW / 2; metal.push(cyl(0.08, 0.08, 2.44, 6, 0xf4f4f4, { x: gx, z: cz - 3.66, y: 1.22 })); metal.push(cyl(0.08, 0.08, 2.44, 6, 0xf4f4f4, { x: gx, z: cz + 3.66, y: 1.22 })); metal.push(box(0.16, 0.16, 7.32, 0xf4f4f4, { x: gx, z: cz, y: 2.44 })); solid(gx - 0.3, cz - 3.8, gx + 0.3, cz + 3.8, 'amenity', p); }
-    const circle = new THREE.Mesh(new THREE.RingGeometry(9.0, 9.15, 48), new THREE.MeshStandardMaterial({ color: 0xf4f4ee, roughness: 0.8 })); circle.rotation.x = -Math.PI / 2; circle.position.set(cx, 0.066, cz); scene.add(circle);
-    // Floodlight masts with 4 x 4 lamp arrays (share the street-lamp emissive so they light up at night).
-    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-      const x = cx + sx * (rx + 30), z = cz + sz * (rz + 22);
-      metal.push(cyl(0.5, 0.9, 40, 8, 0xbfc4cc, { x, z, y: 20 })); metal.push(box(1.6, 1.6, 1.6, 0x8b949e, { x, z, y: 40.2 }));
-      const yaw = Math.atan2(cx - x, cz - z);
-      const frame = box(7, 4.2, 0.5, 0x3a4048, { y: 42.5 }); frame.rotateY(yaw); frame.translate(x, 0, z); dark.push(frame);
-      const lamps = new THREE.Group(); lamps.position.set(x, 42.5, z); lamps.rotation.y = yaw;
-      const lampGeo = new THREE.BoxGeometry(1.3, 0.8, 0.25);
-      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const m = new THREE.Mesh(lampGeo, ctx.lampHeadMat || new THREE.MeshStandardMaterial({ color: 0xfff6dd })); m.position.set(-2.4 + i * 1.6, -1.5 + j * 1.0, 0.35); lamps.add(m); }
-      scene.add(lamps);
-      solid(x - 1, z - 1, x + 1, z + 1, 'amenity', p);
-    }
-    // Corner entrance gates with stairs.
-    // Entrance gates sit in the four corners of the 200 x 210 m lot (outside the stand ellipse, inside the boundary).
-    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-      const x = cx + sx * (a.w / 2 - 9), z = cz + sz * (a.h / 2 - 9);
-      plaster.push(box(10, 7, 6, 0xf1eee8, { x, z, y: 3.5 })); dark.push(box(4, 4, 0.4, 0x3a4048, { x, z: z + sz * 3.1, y: 2 })); plaster.push(box(10.6, 0.5, 6.6, 0xc9a227, { x, z, y: 7.2 }));
-      for (let s = 0; s < 4; s++) plaster.push(box(6, 0.25, 1, 0xd9d5cc, { x, z: z + sz * (3.6 + s), y: 0.125 + (3 - s) * 0.25 }));
-      solid(x - 5, z - 3, x + 5, z + 3, 'amenity', p);
-    }
-  }
+  // School and stadium: see campus.js.
   // Agro plant: sheds, silos, fence.
   { const a = A.agro; const p = plotOf('agro');
     for (let i = 0; i < 5; i++) { const x = a.x + 60 + i * 170, z = a.y + 15, w = 110, d = 34; metal.push(box(w, 11, d, 0xd9dde3, { x: x + w / 2, z: z + d / 2, y: 5.5 })); metal.push(box(w + 1, 1.2, d + 1, 0x8e969f, { x: x + w / 2, z: z + d / 2, y: 11.3 })); dark.push(box(8, 7, 0.3, 0x3a4048, { x: x + w / 2, z: z + d + 0.1, y: 3.5 })); solid(x, z, x + w, z + d, 'amenity', p); }
@@ -215,5 +136,5 @@ export function buildAmenities(ctx) {
   add(dark, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }), 'amenity-dark');
   add(lawnPaths, stdMat(T, T.paving), 'amenity-paths');
   add(track, stdMat(T, T.track), 'tracks');
-  const gm = new THREE.Mesh(merge(glass), ctx.glassMat); gm.name = 'amenity-glass'; scene.add(gm);
+  if (glass.length) { const gm = new THREE.Mesh(merge(glass), ctx.glassMat); gm.name = 'amenity-glass'; scene.add(gm); }
 }

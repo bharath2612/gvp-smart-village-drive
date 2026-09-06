@@ -22,7 +22,7 @@ export function buildGround(ctx) {
   for (const p of L.parks) groups.lawn.push(patchGeo(p.x, p.y, p.w, p.h, 4, 0.02));
   for (const a of L.amenities) {
     if (a.id === 'temple') { groups.lawn.push(patchGeo(a.x, a.y, a.w, a.h, 4, 0.02)); }
-    else if (a.id === 'school') { groups.paving.push(patchGeo(a.x, a.y, a.w * 0.55, a.h, 4, 0.02)); groups.lawn.push(patchGeo(a.x + a.w * 0.55, a.y, a.w * 0.45, a.h, 4, 0.02)); }
+    else if (a.id === 'school') groups.lawn.push(patchGeo(a.x, a.y, a.w, a.h, 4, 0.02));
     else if (a.id === 'stadium') groups.lawn.push(patchGeo(a.x, a.y, a.w, a.h, 4, 0.02));
     else if (a.id === 'agro') groups.concrete.push(patchGeo(a.x, a.y, a.w, a.h, 5, 0.02));
     else if (a.id === 'parking') groups.asphalt.push(patchGeo(a.x, a.y, a.w, a.h, 4, 0.02));

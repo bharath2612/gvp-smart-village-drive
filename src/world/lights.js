@@ -71,9 +71,18 @@ export function buildLights(ctx) {
   scene.add(instancedChunks(gbCap, ctx.lampHeadMat || postMat, parkPosts, { name: 'park-light-caps', chunk: 400 }));
   scene.add(instancedChunks(disc, streetMat, parkPosts.map((p) => ({ ...p, sx: 5, sy: 1, sz: 5 })), { name: 'light-pools-park', chunk: 400 }));
 
-  // Stadium floodlight pools over the pitch and stands.
+  // Stadium concourse and school campus bollards.
   const st = world.amenities.find((a) => a.id === 'stadium');
-  if (st) { const cx = st.x + st.w / 2, cz = st.y + st.h / 2; const items = [{ x: cx, z: cz, sx: 190, sy: 1, sz: 200 }]; for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) items.push({ x: cx + sx * 60, z: cz + sz * 55, sx: 90, sy: 1, sz: 90 }); scene.add(instancedChunks(disc, stadiumMat, items, { name: 'light-pools-stadium', chunk: 1000 })); }
+  const camp = [];
+  if (st) { const cx = st.x + st.w / 2, cz = st.y + st.h / 2; for (let i = 0; i < 28; i++) { const ang = (i / 28) * Math.PI * 2; camp.push({ x: cx + Math.cos(ang) * 92, z: cz + Math.sin(ang) * 97 }); } for (let x = cx + 88; x < st.x + st.w - 2; x += 8) { camp.push({ x, z: cz - 7 }); camp.push({ x, z: cz + 7 }); } }
+  const sch = world.amenities.find((a) => a.id === 'school');
+  if (sch && ctx.schoolInfo) { const si = ctx.schoolInfo; for (let x = 1520; x < sch.x + 42; x += 8) { camp.push({ x, z: si.cz - 5.5 }); camp.push({ x, z: si.cz + 5.5 }); } for (let x = si.plazaX + 4; x < si.plazaX + si.plazaW; x += 10) { camp.push({ x, z: si.cz - si.plazaD / 2 + 1 }); camp.push({ x, z: si.cz + si.plazaD / 2 - 1 }); } }
+  scene.add(instancedChunks(gb, postMat, camp, { name: 'campus-lights', chunk: 400 }));
+  scene.add(instancedChunks(gbCap, ctx.lampHeadMat || postMat, camp, { name: 'campus-light-caps', chunk: 400 }));
+  scene.add(instancedChunks(disc, streetMat, camp.map((q) => ({ ...q, sx: 6, sy: 1, sz: 6 })), { name: 'light-pools-campus', chunk: 400 }));
+  if (sch && ctx.schoolInfo) { const si = ctx.schoolInfo; scene.add(instancedChunks(disc, facadeMat, [{ x: si.plazaX + si.plazaW / 2, z: si.cz, sx: 70, sy: 1, sz: 70 }, { x: si.plazaX + si.plazaW / 2, z: si.cz - si.plazaD / 2 - 6, sx: 90, sy: 1, sz: 18 }], { name: 'light-pools-school', chunk: 1000 })); }
+  // Stadium floodlight pools over the pitch and stands.
+  if (st) { const cx = st.x + st.w / 2, cz = st.y + st.h / 2; const items = [{ x: cx, z: cz, sx: 150, sy: 1, sz: 160 }]; for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) items.push({ x: cx + sx * 40, z: cz + sz * 44, sx: 70, sy: 1, sz: 70 }); scene.add(instancedChunks(disc, stadiumMat, items, { name: 'light-pools-stadium', chunk: 1000 })); }
   // Temple: uplight pools at the tower corners and mandapa, plus soft warm light beams rising up the gopuram.
   if (temple) {
     const cx = temple.x + temple.w / 2, cz = temple.y + temple.h / 2, tz = cz - 8, mz = cz + 18;

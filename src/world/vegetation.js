@@ -57,6 +57,9 @@ export function buildVegetation(ctx) {
   // Lake ring outside the track, temple lawns.
   { const lk = L.lake.bbox; const o = 24; for (let x = lk.x - o; x <= lk.x + lk.w + o; x += 16) { addTree(x, lk.y - o, pick(PALMS)); addTree(x, lk.y + lk.h + o, pick(PALMS)); } for (let z = lk.y - o + 16; z < lk.y + lk.h + o; z += 16) { addTree(lk.x - o, z, pick(PALMS)); addTree(lk.x + lk.w + o, z, pick(PALMS)); } }
   { const t = L.amenities.find((a) => a.id === 'temple'); for (let i = 0; i < 28; i++) { const x = t.x + 8 + r() * (t.w - 16), z = t.y + 8 + r() * (t.h - 16); if (Math.abs(x - t.x - t.w / 2) < 48 && Math.abs(z - t.y - t.h / 2) < 48) continue; if (Math.abs(x - t.x - t.w / 2) < 6 || Math.abs(z - t.y - t.h / 2) < 6) continue; addTree(x, z, i % 3 ? pick(BROAD) : pick(PALMS)); } }
+  // Stadium concourse ring and school boundary trees.
+  { const st = L.amenities.find((q) => q.id === 'stadium'); const cx = st.x + st.w / 2, cz = st.y + st.h / 2; for (let i = 0; i < 24; i++) { const ang = (i / 24) * Math.PI * 2; if (Math.abs(Math.sin(ang)) < 0.12 || Math.abs(Math.cos(ang)) < 0.12) continue; addTree(cx + Math.cos(ang) * 95, cz + Math.sin(ang) * 100, pick(PALMS), true, 0.8); }
+    const sc = L.amenities.find((q) => q.id === 'school'); for (let x = sc.x + 8; x < sc.x + sc.w - 4; x += 14) { addTree(x, sc.y + 4, pick(BROAD), true, 0.75); addTree(x, sc.y + sc.h - 4, pick(BROAD), true, 0.75); } for (let z = sc.y + 16; z < sc.y + sc.h - 8; z += 14) { addTree(sc.x + sc.w - 4, z, pick(BROAD), true, 0.75); if (Math.abs(z - (sc.y + sc.h / 2)) > 10) addTree(sc.x + 4, z, pick(BROAD), true, 0.7); } }
   // Farm plots: 6 to 10 along the hedges, away from the pad.
   for (const f of L.farms) {
     const n = 6 + Math.floor(r() * 5);

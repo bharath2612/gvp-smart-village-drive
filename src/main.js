@@ -201,6 +201,27 @@ async function boot() {
     if (act === 'driveon') ui.hideComplete();
     if (act === 'next') { ui.hideComplete(); openOverlay('missions'); }
   }));
+  // Minimap: click opens the map; +/- change its zoom.
+  $('minimap').addEventListener('click', () => { if (G.phase === 'drive' && !G.overlay) openOverlay('bigmap'); });
+  $('mm-plus').onclick = () => { minimap.zoomIn(); audio.click(); }; $('mm-minus').onclick = () => { minimap.zoomOut(); audio.click(); };
+  // Big map: click drops a pin, "Fly there" flies the car to the nearest road at that spot.
+  $('bigmap-canvas').addEventListener('click', (e) => {
+    const p = minimap.bigToWorld(e.clientX, e.clientY); if (!p) return;
+    minimap.mark = p; const near = world.plotsNear(p.x, p.z, 25)[0];
+    $('fly-text').textContent = `${world.zoneOf(p.x, p.z)}${near ? ` · near ${near.plot.kind}${near.plot.n ? ' ' + near.plot.n : ''}` : ''} · ${Math.round(Math.hypot(p.x - car.x, p.z - car.z))} m away`;
+    $('fly-bar').classList.remove('hidden');
+    minimap.drawBig(car, missions.active ? missions.active.rings.filter((r, i) => !missions.done.has(i)) : [], missions.target());
+  });
+  $('fly-btn').onclick = () => { const p = minimap.mark; if (!p) return; closeOverlay(); startFlight(p.x, p.z); audio.click(); };
+  function startFlight(x, z) {
+    const pl = roadPlacement(world, x, z);
+    const dx = x - pl.x, dz = z - pl.y; let yaw = pl.yaw;
+    if (pl.road.horizontal) yaw = dx >= 0 ? Math.PI / 2 : -Math.PI / 2; else yaw = dz >= 0 ? Math.PI : 0;
+    if (Math.abs(dx) < 15 && Math.abs(dz) < 15) yaw = pl.yaw;
+    const dist = Math.hypot(pl.x - car.x, pl.y - car.z);
+    G.flight = { t: 0, dur: Math.min(4.5, 1.4 + dist / 700), from: { x: car.x, z: car.z }, to: { x: pl.x, z: pl.y, yaw }, camFrom: camera.position.clone() };
+    car.frozen = true; carVisual.root.visible = false; ui.hideCard(); minimap.mark = null; $('fly-bar').classList.add('hidden');
+  }
   $('tod-btn').onclick = () => cycleTod(); $('mute-btn').onclick = () => audio.setMuted(!audio.muted); $('pause-btn').onclick = () => openOverlay('pause');
   $('title-missions').onclick = () => openOverlay('missions'); $('title-settings').onclick = () => openOverlay('settings');
   function cycleTod() { const i = PRESET_ORDER.indexOf(ctx.lighting.name); const n = PRESET_ORDER[(i + 1) % 3]; ctx.lighting.set(n); settings.set('timeOfDay', n); }
@@ -272,8 +293,16 @@ async function boot() {
         if (ev.type === 'lake' && !G.lakeSeq) { G.lakeSeq = { t: 0 }; audio.splash(); rig.addShake(0.6); $('splash').classList.add('show'); ui.toast('Splash! Fished out onto the joggers’ track.', 4); }
       }
       if (G.lakeSeq) { G.lakeSeq.t += dt; carVisual.root.position.y = -Math.min(1.5, G.lakeSeq.t * 2); if (G.lakeSeq.t > 0.9 && !G.lakeSeq.moved) { G.lakeSeq.moved = true; respawnOnTrack(); $('splash').classList.remove('show'); } if (G.lakeSeq.t > 1.4) { G.lakeSeq = null; car.frozen = false; carVisual.root.position.y = 0; } }
+      if (G.flight) {
+        const f = G.flight; f.t = Math.min(f.dur, f.t + dt); const u = f.t / f.dur, e = u * u * (3 - 2 * u);
+        const gx = lerp(f.from.x, f.to.x, e), gz = lerp(f.from.z, f.to.z, e);
+        const h = 12 + Math.sin(Math.PI * u) * Math.min(320, 60 + Math.hypot(f.to.x - f.from.x, f.to.z - f.from.z) * 0.35);
+        const fwd = new THREE.Vector3(Math.sin(f.to.yaw), 0, -Math.cos(f.to.yaw));
+        camera.position.set(gx - fwd.x * 8 * (1 - u) - fwd.x * 8, h, gz - fwd.z * 8 * (1 - u) - fwd.z * 8); camera.up.set(0, 1, 0); camera.lookAt(gx + fwd.x * 6, 1, gz + fwd.z * 6);
+        if (f.t >= f.dur) { car.reset(f.to.x, f.to.z, f.to.yaw); car.frozen = false; carVisual.root.visible = true; rig.snapTo(car); G.flight = null; ui.toast(`Landed in ${world.zoneOf(car.x, car.z)}.`, 3); }
+      }
       carVisual.update(dt, car, alpha, input, simTime);
-      rig.update(dt, car, alpha, input);
+      if (!G.flight) rig.update(dt, car, alpha, input);
       ctx.lighting.update(dt, car);
       carVisual.setNight(ctx.lighting.isNight);
       audio.setAmbience(ctx.lighting.ambience);

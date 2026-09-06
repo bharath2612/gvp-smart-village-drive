@@ -1,12 +1,22 @@
 // North-up minimap drawn from layout.json on a canvas; full-screen map with plot labels.
 export class Minimap {
   constructor(world, canvas, bigCanvas) {
-    this.world = world; this.canvas = canvas; this.big = bigCanvas;
+    this.world = world; this.canvas = canvas; this.bigCanvas = bigCanvas;
     this.base = document.createElement('canvas'); this.base.width = this.base.height = 1536;
     this.drawBase(this.base.getContext('2d'), 1536, false);
     this.baseBig = document.createElement('canvas'); this.baseBig.width = this.baseBig.height = 3000;
     this.drawBase(this.baseBig.getContext('2d'), 3000, true);
     this.mode = 'north'; this.rings = []; this.availability = null;
+    this.levels = [180, 260, 420, 650, 1000]; this.level = 2; this.mark = null; this.big = null;
+  }
+  zoomIn() { this.level = Math.max(0, this.level - 1); }
+  zoomOut() { this.level = Math.min(this.levels.length - 1, this.level + 1); }
+  // Convert a click on the big map canvas (client coords) to world metres, or null when outside the plan.
+  bigToWorld(clientX, clientY) {
+    if (!this.big) return null; const c = this.big.canvas; const r = c.getBoundingClientRect();
+    const px = (clientX - r.left) * (c.width / r.width), py = (clientY - r.top) * (c.height / r.height);
+    const x = (px - this.big.ox) / this.big.k, z = (py - this.big.oy) / this.big.k;
+    if (x < 0 || z < 0 || x > 3000 || z > 3000) return null; return { x, z };
   }
   drawBase(g, size, labels) {
     const k = size / 3000; const L = this.world.L;
@@ -40,7 +50,7 @@ export class Minimap {
   }
   draw(car, rings, target) {
     const c = this.canvas; const g = c.getContext('2d'); const W = c.width, H = c.height;
-    const view = 420; // metres across the minimap
+    const view = this.levels[this.level]; // metres across the minimap
     const k = W / view; const kb = this.base.width / 3000;
     g.save(); g.clearRect(0, 0, W, H);
     g.beginPath(); g.arc(W / 2, H / 2, W / 2 - 2, 0, Math.PI * 2); g.clip();
@@ -58,12 +68,14 @@ export class Minimap {
     g.fillStyle = '#f5f5f5'; g.font = 'bold 11px Inter, sans-serif'; g.textAlign = 'center'; g.fillText('N', W / 2, 14);
   }
   drawBig(car, rings, target) {
-    const c = this.big; const g = c.getContext('2d'); const size = Math.min(c.width, c.height); const k = size / 3000;
+    const c = this.bigCanvas; const g = c.getContext('2d'); const size = Math.min(c.width, c.height); const k = size / 3000;
     g.clearRect(0, 0, c.width, c.height);
-    const ox = (c.width - size) / 2, oy = (c.height - size) / 2;
+    const ox = (c.width - size) / 2, oy = (c.height - size) / 2; this.big = { canvas: c, ox, oy, k };
     g.drawImage(this.baseBig, ox, oy, size, size);
     for (const r of rings || []) { g.fillStyle = r === target ? '#ffd35a' : 'rgba(201,162,39,0.7)'; g.beginPath(); g.arc(ox + r.x * k, oy + r.z * k, 7, 0, Math.PI * 2); g.fill(); }
     g.save(); g.translate(ox + car.x * k, oy + car.z * k); g.rotate(car.yaw); g.fillStyle = '#ffd35a'; g.strokeStyle = '#0a0f1c'; g.lineWidth = 2;
     g.beginPath(); g.moveTo(0, -12); g.lineTo(8, 9); g.lineTo(0, 5); g.lineTo(-8, 9); g.closePath(); g.fill(); g.stroke(); g.restore();
+    if (this.mark) { const mx = ox + this.mark.x * k, my = oy + this.mark.z * k; g.save(); g.strokeStyle = '#ffd35a'; g.fillStyle = 'rgba(255,211,90,0.25)'; g.lineWidth = 2;
+      g.beginPath(); g.arc(mx, my, 14, 0, Math.PI * 2); g.fill(); g.stroke(); g.beginPath(); g.moveTo(mx - 22, my); g.lineTo(mx + 22, my); g.moveTo(mx, my - 22); g.lineTo(mx, my + 22); g.stroke(); g.restore(); }
   }
 }

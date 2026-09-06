@@ -16,6 +16,7 @@ import { buildAmenities } from './world/amenities.js';
 import { buildLake } from './world/lake.js';
 import { buildVegetation, updateLOD } from './world/vegetation.js';
 import { buildProps } from './world/props.js';
+import { buildLights } from './world/lights.js';
 import { loadModelSet } from './world/models.js';
 import { buildLighting, PRESET_ORDER } from './world/lighting.js';
 import { CarModel } from './car/model.js';
@@ -73,6 +74,7 @@ async function boot() {
     ['Filling the lake…', () => buildLake(ctx)],
     ['Planting trees, hedges and crops…', () => buildVegetation(ctx)],
     ['Parking cars, planting flowers…', () => buildProps(ctx)],
+    ['Wiring street, garden and stadium lights…', () => buildLights(ctx)],
     ['Lighting…', () => buildLighting(ctx)],
   ];
   const t0 = performance.now();
@@ -285,7 +287,7 @@ async function boot() {
       if (!G.autoQ.done) { G.autoQ.t += dt; if (G.autoQ.t > 2) { G.autoQ.sum += 1 / Math.max(dt, 1e-3); G.autoQ.samples++; } if (G.autoQ.t > 5) { G.autoQ.done = true; const avg = G.autoQ.sum / G.autoQ.samples; console.log('[auto-quality] avg fps', avg.toFixed(1)); if (avg < 45) { settings.set('quality', 'low'); renderer.shadowMap.enabled = false; ctx.lighting.sun.castShadow = false; renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25)); ui.toast('Performance: switched to Low quality (saved for next time).', 4); } } }
       if (!$('debug').classList.contains('hidden')) {
         const info = renderer.info;
-        ui.debug([`fps ${loop.fps.toFixed(0)}  frame ${(dt * 1000).toFixed(1)} ms  steps ${loop.stepsThisFrame}`, `draw calls ${info.render.calls}  tris ${(info.render.triangles / 1e6).toFixed(2)} M`, `pos ${car.x.toFixed(1)}, ${car.z.toFixed(1)}  yaw ${(car.yaw * 57.3).toFixed(0)}°`, `speed ${(car.speed * KMH).toFixed(1)} km/h  slip ${(car.telemetry.slip * 30).toFixed(1)}°  latG ${car.telemetry.latG.toFixed(1)}`, `steer ${(car.steer * 57.3).toFixed(1)}° / max ${(car.steerMax * 57.3).toFixed(0)}°  boost ${(car.boostCharge * 100).toFixed(0)}%`, `offroad ${car.offroad}  hedge ${!!car.hedge}  stuck ${car.stuck.toFixed(2)}`, `zone ${world.zoneOf(car.x, car.z)}  nearest ${lastNearestPick ? lastNearestPick.plot.id : '-'}`, `colliders ${colliders.list.length}  trees ${ctx.treeCount}  shrubs ${ctx.shrubCount}  parked ${ctx.parkedCars || 0}`, `counts farms ${world.L.farms.length} villas ${world.L.villas.length} th ${world.L.townhouses.length} com ${world.L.commercial.length} parks ${world.L.parks.length}`]);
+        ui.debug([`fps ${loop.fps.toFixed(0)}  frame ${(dt * 1000).toFixed(1)} ms  steps ${loop.stepsThisFrame}`, `draw calls ${info.render.calls}  tris ${(info.render.triangles / 1e6).toFixed(2)} M`, `pos ${car.x.toFixed(1)}, ${car.z.toFixed(1)}  yaw ${(car.yaw * 57.3).toFixed(0)}°`, `speed ${(car.speed * KMH).toFixed(1)} km/h  slip ${(car.telemetry.slip * 30).toFixed(1)}°  latG ${car.telemetry.latG.toFixed(1)}`, `steer ${(car.steer * 57.3).toFixed(1)}° / max ${(car.steerMax * 57.3).toFixed(0)}°  boost ${(car.boostCharge * 100).toFixed(0)}%`, `offroad ${car.offroad}  hedge ${!!car.hedge}  stuck ${car.stuck.toFixed(2)}`, `zone ${world.zoneOf(car.x, car.z)}  nearest ${lastNearestPick ? lastNearestPick.plot.id : '-'}`, `colliders ${colliders.list.length}  trees ${ctx.treeCount}  shrubs ${ctx.shrubCount}  parked ${ctx.parkedCars || 0}  lights ${JSON.stringify(ctx.lightCounts || {})}`, `counts farms ${world.L.farms.length} villas ${world.L.villas.length} th ${world.L.townhouses.length} com ${world.L.commercial.length} parks ${world.L.parks.length}`]);
       }
     }
     for (const fn of ctx.animate) fn(dt, simTime);

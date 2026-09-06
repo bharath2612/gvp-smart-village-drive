@@ -67,6 +67,8 @@ export function buildVegetation(ctx) {
       addTree(x, z, pick(BROAD), true, 0.7 + r() * 0.3);
     }
   }
+  // Footpath trees: one small flowering tree at the front-left corner of every villa plot (never in front of a gate).
+  for (const p of world.plots) { if (p.type !== 'villa') continue; const z = p.facing === 'S' ? p.y + p.h + 1.0 : p.y - 1.0; addTree(p.x + 1.5, z, 3, true, 0.5 + r() * 0.15); }
   // Villa gardens: one tree behind each house.
   for (const p of world.plots) { if (p.type === 'villa') { const x = p.x + 3 + r() * (p.w - 6), z = p.facing === 'S' ? p.y + 2.5 : p.y + p.h - 2.5; addTree(x, z, pick(BROAD), false, 0.55 + r() * 0.25); } }
 

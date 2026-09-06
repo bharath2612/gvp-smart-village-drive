@@ -28,24 +28,28 @@ function subtract(len, intervals) {
 export function buildRoads(ctx) {
   const { scene, world, T, colliders } = ctx;
   const roads = world.roads;
-  const asphalt = [], concrete = [], marks = [], kerbs = [], medians = [], verges = [], zebras = [], stops = [], ramps = [];
-  const bumpItems = [], signItems = [];
+  const asphalt = [], concrete = [], pavers = [], footpaths = [], marks = [], kerbs = [], medians = [], verges = [], zebras = [], stops = [], ramps = [];
+  const bumpItems = [], signItems = [], bollardItems = [];
+  ctx.lightPoints = [];
   const lampItems = [];
   ctx.bumps = [];
 
   for (const r of roads) {
     const isSpine = r.kind === 'spine';
-    const surf = r.kind === '25m' ? concrete : asphalt;
-    surf.push(patchGeo(r.x, r.y, r.w, r.h, 4, 0.06));
+    const residential = r.kind === '10m' || r.kind === '15m' || r.kind === '20m';
+    const surf = r.kind === '25m' ? concrete : residential ? pavers : asphalt;
+    surf.push(patchGeo(r.x, r.y, r.w, r.h, residential ? 3 : 4, 0.06));
     const len = r.horizontal ? r.w : r.h; const wid = r.horizontal ? r.h : r.w;
     const jx = junctionIntervals(r, roads);
     const segs = subtract(len, jx);
     const along = (t, off, y, gw, gl) => (r.horizontal ? patchGeo(r.x + t, r.y + off - gw / 2, gl, gw, 1, y) : patchGeo(r.x + off - gw / 2, r.y + t, gw, gl, 1, y));
-    // 25 m roads and the spine get a 3 m planted verge along both edges (trees stand on grass, not asphalt).
+    // 25 m roads and the spine get a 3 m planted verge along both edges (trees stand on grass, not asphalt);
+    // residential streets get a 2 m cobbled footpath with bollard lights instead.
     const verge = (r.kind === '25m' || isSpine) ? 3 : 0;
+    const path = residential ? 2 : 0;
     // Edge lines and kerbs along non-junction segments.
     for (const [a, b] of segs) {
-      for (const side of [verge + 0.5, wid - verge - 0.5]) marks.push(along(a, side, 0.09, 0.15, b - a));
+      if (!residential) for (const side of [verge + 0.5, wid - verge - 0.5]) marks.push(along(a, side, 0.09, 0.15, b - a));
       for (const side of [-0.15, wid + 0.15]) {
         const kg = r.horizontal ? box(b - a, 0.15, 0.3, 0xb9b7b0, { x: r.x + a + (b - a) / 2, z: r.y + side }) : box(0.3, 0.15, b - a, 0xb9b7b0, { x: r.x + side, z: r.y + a + (b - a) / 2 });
         kerbs.push(kg);
@@ -58,17 +62,32 @@ export function buildRoads(ctx) {
         for (const end of [a === 0 ? null : va, b === len ? null : vb]) if (end !== null) for (const side of [verge / 2, wid - verge / 2]) kerbs.push(r.horizontal ? box(0.25, 0.12, verge, 0xb9b7b0, { x: r.x + end, z: r.y + side }) : box(verge, 0.12, 0.25, 0xb9b7b0, { x: r.x + side, z: r.y + end }));
         }
       }
+      if (path) {
+        const va = a === 0 ? 0 : a + 3, vb = b === len ? len : b - 3;
+        if (vb - va >= 6) {
+          footpaths.push(along(va, path / 2, 0.11, path, vb - va)); footpaths.push(along(va, wid - path / 2, 0.11, path, vb - va));
+          for (const side of [path, wid - path]) kerbs.push(r.horizontal ? box(vb - va, 0.14, 0.22, 0xc9c5bb, { x: r.x + va + (vb - va) / 2, z: r.y + side }) : box(0.22, 0.14, vb - va, 0xc9c5bb, { x: r.x + side, z: r.y + va + (vb - va) / 2 }));
+          // Bollard lights every 12 m on both footpaths.
+          for (let t = va + 4; t < vb - 2; t += 12) for (const side of [0.6, wid - 0.6]) { const x = r.horizontal ? r.x + t : r.x + side, z = r.horizontal ? r.y + side : r.y + t; bollardItems.push({ x, z }); ctx.lightPoints.push({ x, z, r: 4.5, kind: 'bollard' }); }
+        }
+      }
       // Centre dashes on 15 m and wider (not the spine: it has a median).
       if (!isSpine && (r.kind === '15m' || r.kind === '20m' || r.kind === '25m')) {
         for (let t = a + 2; t < b - 3; t += 9) marks.push(along(t, wid / 2, 0.09, 0.15, 3));
       }
-      // Lamp posts every 40 m on 20 m and wider, both sides, 1.2 m inside the kerb.
-      if (r.kind === '20m' || r.kind === '25m' || isSpine) {
-        for (let t = a + 12; t < b - 6; t += 40) for (const side of [verge ? 1.5 : 1.2, wid - (verge ? 1.5 : 1.2)]) {
-          const x = r.horizontal ? r.x + t : r.x + side, z = r.horizontal ? r.y + side : r.y + t;
-          const rot = r.horizontal ? (side < wid / 2 ? Math.PI : 0) : (side < wid / 2 ? -Math.PI / 2 : Math.PI / 2);
-          lampItems.push({ x, z, rot });
-          colliders.add(x - 0.3, z - 0.3, x + 0.3, z + 0.3, 'lamp');
+      // Lamp posts on every street: both sides every 40 m on 20 m+, alternating sides every 30 m on 10 / 15 m.
+      {
+        const wide = r.kind === '20m' || r.kind === '25m' || isSpine;
+        const step = wide ? 40 : 30; const inset = verge ? 1.5 : path ? 1.0 : 1.2;
+        let k = 0;
+        for (let t = a + 12; t < b - 6; t += step, k++) {
+          const sides = wide ? [inset, wid - inset] : [k % 2 ? inset : wid - inset];
+          for (const side of sides) {
+            const x = r.horizontal ? r.x + t : r.x + side, z = r.horizontal ? r.y + side : r.y + t;
+            const rot = r.horizontal ? (side < wid / 2 ? Math.PI : 0) : (side < wid / 2 ? -Math.PI / 2 : Math.PI / 2);
+            lampItems.push({ x, z, rot, small: !wide });
+            colliders.add(x - 0.3, z - 0.3, x + 0.3, z + 0.3, 'lamp');
+          }
         }
       }
     }
@@ -114,6 +133,8 @@ export function buildRoads(ctx) {
   const add = (list, mat, name, shadow) => { const g = merge(list); if (!g) return; const m = new THREE.Mesh(g, mat); m.name = name; m.receiveShadow = true; m.castShadow = !!shadow; scene.add(m); };
   add(asphalt, stdMat(T, T.asphalt), 'roads-asphalt');
   add(concrete, stdMat(T, T.concrete, { color: 0xc9c7bf }), 'roads-concrete');
+  add(pavers, stdMat(T, T.pavers), 'roads-pavers');
+  add(footpaths, stdMat(T, T.cobble), 'footpaths');
   add(marks, new THREE.MeshStandardMaterial({ color: 0xf2f2ea, roughness: 0.6, emissive: 0x222222 }), 'road-marks');
   add(zebras, new THREE.MeshStandardMaterial({ color: 0xf7f7f2, roughness: 0.55, emissive: 0x2a2a2a }), 'zebras');
   add(stops, new THREE.MeshStandardMaterial({ color: 0xf7f7f2, roughness: 0.55, emissive: 0x2a2a2a }), 'stop-lines');
@@ -142,8 +163,17 @@ export function buildRoads(ctx) {
   const density = ctx.qualityPreset.lamps;
   const r = rng(99);
   const items = lampItems.filter(() => r() < density);
-  scene.add(instancedChunks(pole, poleMat, items, { name: 'lamp-poles', castShadow: false }));
-  scene.add(instancedChunks(head, headMat, items, { name: 'lamp-heads' }));
+  const tall = items.filter((i) => !i.small), small = items.filter((i) => i.small).map((i) => ({ ...i, sx: 0.8, sy: 0.72, sz: 0.8 }));
+  scene.add(instancedChunks(pole, poleMat, tall, { name: 'lamp-poles', castShadow: false }));
+  scene.add(instancedChunks(head, headMat, tall, { name: 'lamp-heads' }));
+  scene.add(instancedChunks(pole, poleMat, small, { name: 'lamp-poles-small', castShadow: false }));
+  scene.add(instancedChunks(head, headMat, small, { name: 'lamp-heads-small' }));
+  for (const it of items) { const f = it.small ? 1.4 * 0.8 : 1.4; ctx.lightPoints.push({ x: it.x + Math.cos(it.rot) * f, z: it.z - Math.sin(it.rot) * f, r: it.small ? 9 : 13, kind: 'lamp' }); }
   ctx.lampHeadMat = headMat;
   ctx.lampItems = items;
+  // Bollard lights: short posts with a warm emissive cap (shares the lamp emissive so they switch on together).
+  const bollard = merge([cyl(0.09, 0.11, 0.85, 8, 0x3a3f46, { y: 0.425 }), box(0.3, 0.06, 0.3, 0x3a3f46, { y: 0.9 })]);
+  const bollardCap = cyl(0.1, 0.1, 0.12, 8, 0xfff2cc, { y: 0.82 });
+  scene.add(instancedChunks(bollard, poleMat, bollardItems, { name: 'bollards', chunk: 400 }));
+  scene.add(instancedChunks(bollardCap, headMat, bollardItems, { name: 'bollard-caps', chunk: 400 }));
 }

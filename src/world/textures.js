@@ -76,6 +76,11 @@ export function buildTextures(quality = 'medium') {
   T.plaster = material(S, 17, (h, a, b) => { const v = 225 + h * 25; return [v, v - 4, v - 12]; }, { normalStrength: 2, roughness: 0.75 });
   T.stone = material(S, 18, (h, a, b, x, y) => { const mortar = ((x % 64) < 3) || ((y % 32) < 3 && ((Math.floor(y / 32) % 2) ? (x + 32) % 64 < 3 : true) === false) ? 0 : 1; const v = mortar ? 150 + h * 50 : 90; return [v, v - 12, v - 30]; }, { normalStrength: 5, roughness: 0.9 });
   T.paving = material(S, 19, (h, a, b, x, y) => { const g = ((x % 64) < 2 || (y % 64) < 2) ? 0.55 : 1; const v = (175 + h * 40) * g; return [v, v - 3, v - 10]; }, { normalStrength: 4, roughness: 0.85 });
+  // Large light concrete pavers (residential carriageways) and fan-laid cobbles (footpaths), as in premium Indian townships.
+  T.pavers = material(S, 24, (h, a, b, x, y) => { const px = 96, py = 48; const row = Math.floor(y / py); const xx = (x + (row % 2) * px / 2) % px; const joint = xx < 3 || (y % py) < 3; const v = joint ? 105 : 178 + h * 40 + (b - 0.5) * 14; return [v + 6, v + 2, v - 6]; },
+    { normalStrength: 5, roughness: 0.85, height: (h, a, b, x, y) => { const px = 96, py = 48; const row = Math.floor(y / py); const xx = (x + (row % 2) * px / 2) % px; return (xx < 3 || (y % py) < 3) ? 0.1 : 0.7 + h * 0.3; } });
+  T.cobble = material(S, 25, (h, a, b, x, y) => { const cx = ((x % 40) - 20), cy = ((y % 40) - 20); const rr = Math.sqrt(cx * cx + cy * cy); const ring = Math.abs((rr % 12) - 6) < 1.2; const v = ring ? 120 : 165 + h * 45 + (b - 0.5) * 22; return [v + 4, v, v - 8]; },
+    { normalStrength: 6, roughness: 0.9, height: (h, a, b, x, y) => { const cx = ((x % 40) - 20), cy = ((y % 40) - 20); const rr = Math.sqrt(cx * cx + cy * cy); return Math.abs((rr % 12) - 6) < 1.2 ? 0.15 : 0.6 + h * 0.4; } });
   T.roof = material(S, 20, (h, a, b) => { const v = 120 + h * 40; return [v, v - 5, v - 12]; }, { normalStrength: 5, roughness: 0.95 });
   T.metal = material(S, 21, (h, a, b, x) => { const rib = (x % 32) < 6 ? 0.8 : 1; const v = (170 + h * 30) * rib; return [v, v + 2, v + 6]; }, { normalStrength: 6, roughness: 0.5 });
   T.sand = material(S, 22, (h, a, b) => [200 + h * 40, 185 + h * 35, 140 + h * 30], { normalStrength: 2, roughness: 1 });

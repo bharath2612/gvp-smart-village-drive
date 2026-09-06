@@ -38,6 +38,11 @@ function parapet(list, w, d, y, h = 0.7, t = 0.22, color = C.parapet) {
   list.push(box(w, h, t, color, { y: y + h / 2, z: d / 2 - t / 2 })); list.push(box(w, h, t, color, { y: y + h / 2, z: -d / 2 + t / 2 }));
   list.push(box(t, h, d, color, { x: w / 2 - t / 2, y: y + h / 2 })); list.push(box(t, h, d, color, { x: -w / 2 + t / 2, y: y + h / 2 }));
 }
+// Warm cove-light strips (rendered with the emissive glass material, so they glow at night) along cornices and parapets.
+function cove(glass, w, d, y, inset = 0.12) {
+  glass.push(box(w - 0.4, 0.06, 0.08, 0xffd9a0, { y, z: d / 2 + inset })); glass.push(box(w - 0.4, 0.06, 0.08, 0xffd9a0, { y, z: -d / 2 - inset }));
+  glass.push(box(0.08, 0.06, d - 0.4, 0xffd9a0, { x: w / 2 + inset, y })); glass.push(box(0.08, 0.06, d - 0.4, 0xffd9a0, { x: -w / 2 - inset, y }));
+}
 function glassRail(list, w, y, z, h = 1.0) { list.push(box(w, h, 0.06, C.glassRail, { y: y + h / 2, z })); list.push(box(w, 0.06, 0.08, C.dark, { y: y + h, z })); }
 
 // Villa: 20 x 15 footprint, front on +Z. Three facade variants.
@@ -51,6 +56,8 @@ function villa(variant) {
   L.push(box(W, 3.4, D - setback, C.wall, { y: H1 + 0.35 + 1.7, z: -setback / 2 }));
   L.push(box(W + 0.4, 0.3, D - setback + 0.4, C.cornice, { y: H2 + 0.15, z: -setback / 2 }));
   parapet(L, W + 0.4, D - setback + 0.4, H2 + 0.3, 0.6);
+  cove(G, W + 0.5, D + 0.5, H1 - 0.1); { const g2 = []; cove(g2, W + 0.4, D - setback + 0.4, H2 - 0.1); for (const b of g2) { b.translate(0, 0, -setback / 2); G.push(b); } }
+  G.push(box(W - 1, 0.06, 0.1, 0xffd9a0, { y: H1 - 0.05, z: D / 2 + 2.6 }));
   L.push(box(3.2, 2.6, 2.6, C.wall, { x: -W / 2 + 2.2, y: H2 + 0.3 + 1.3, z: -D / 2 + setback / 2 + 2 }));
   // Verandah across the front with columns (round on variants 0/2, square on 1).
   const vz = D / 2 + 2.6;
@@ -84,6 +91,7 @@ function farmhouse() {
   L.push(box(W, F, D, C.wall, { y: 0.5 + F / 2 }));
   L.push(box(W + 0.5, 0.35, D + 0.5, C.cornice, { y: H1 + 0.175 }));
   parapet(L, W + 0.4, D + 0.4, H1 + 0.35, 0.9);
+  cove(G, W + 0.5, D + 0.5, H1 - 0.1); G.push(box(W - 1, 0.06, 0.1, 0xffd9a0, { y: H1 - 0.06, z: D / 2 + 2.8 }));
   L.push(box(3, 2.4, 2.6, C.wall, { x: -W / 2 + 2, y: H1 + 0.35 + 1.2, z: -D / 2 + 1.8 }));
   L.push(box(W + 0.4, 0.3, 3.0, C.cornice, { y: H1 + 0.15, z: D / 2 + 1.5 }));
   L.push(box(W + 0.4, 0.15, 3.0, C.stone, { y: 0.575, z: D / 2 + 1.5 }));
@@ -107,6 +115,7 @@ function townhouse(variant) {
   L.push(box(W, 3.1, D, C.wall, { y: H1 + 0.3 + 1.55 }));
   L.push(box(W + 0.3, 0.28, D + 0.4, C.cornice, { y: H2 + 0.14 }));
   parapet(L, W + 0.3, D + 0.4, H2 + 0.28, 0.6);
+  cove(G, W + 0.3, D + 0.4, H1 - 0.08); cove(G, W + 0.3, D + 0.4, H2 - 0.08);
   L.push(box(2.6, 2.2, 2.4, C.wall, { x: W / 2 - 2.2, y: H2 + 0.28 + 1.1, z: -D / 2 + 1.8 }));
   // Front porch with two columns, first-floor balcony or bay.
   L.push(box(6, 0.3, 2.4, C.cornice, { x: -W / 2 + 4, y: H1 + 0.15, z: D / 2 + 1.2 }));
@@ -132,6 +141,7 @@ function commercial() {
   L.push(box(W, 3.4, D, C.wall, { y: H2 + 0.3 + 1.7 }));
   L.push(box(W + 0.5, 0.4, D + 0.5, C.cornice, { y: H3 + 0.2 }));
   parapet(L, W + 0.5, D + 0.5, H3 + 0.4, 0.9);
+  cove(G, W + 0.5, D + 0.5, H1 - 0.08); cove(G, W + 0.5, D + 0.5, H2 - 0.08); cove(G, W + 0.5, D + 0.5, H3 - 0.08);
   L.push(box(4, 2.6, 4, C.wall, { x: -W / 2 + 3, y: H3 + 0.4 + 1.3, z: -D / 2 + 3 }));
   // Arcade along the front and both long sides.
   const xs = []; for (let x = -W / 2 + 1; x <= W / 2 - 1; x += 4.6) xs.push(x);
@@ -152,7 +162,8 @@ const FACING_ROT = { S: 0, N: Math.PI, E: Math.PI / 2, W: -Math.PI / 2 };
 
 export function buildBuildings(ctx) {
   const { scene, world, T, colliders } = ctx;
-  const bodyMat = stdMat(T, T.plaster, { vertexColors: true, roughness: 0.8 });
+  const bodyMat = stdMat(T, T.plaster, { vertexColors: true, roughness: 0.8, emissive: 0x6b4a22, emissiveIntensity: 0 });
+  ctx.bodyMat = bodyMat; // warm facade wash at night (driven by the lighting preset)
   bodyMat.map.repeat.set(1, 1);
   const glassMat = new THREE.MeshStandardMaterial({ color: 0x6f93b3, roughness: 0.18, metalness: 0.35, emissive: 0xffc36b, emissiveIntensity: 0 });
   ctx.glassMat = glassMat;

@@ -2,9 +2,11 @@ import * as THREE from 'three';
 import { lerp } from '../util/math.js';
 
 const PRESETS = {
-  day: { sunEl: 58, sunAz: 210, sunColor: 0xfff1dc, sunI: 2.8, hemiSky: 0x9ec9ff, hemiGround: 0x6b7a4b, hemiI: 1.25, fog: 0xcfe0f2, fogNear: 350, fogFar: 1600, top: 0x2f6fd0, horizon: 0xcfe3f7, exposure: 1.1, lamps: 0, windows: 0, stars: 0, ambience: 'day' },
-  sunset: { sunEl: 9, sunAz: 265, sunColor: 0xffa04d, sunI: 2.0, hemiSky: 0xd99a6c, hemiGround: 0x4c4a3a, hemiI: 0.6, fog: 0xf1c49a, fogNear: 250, fogFar: 1100, top: 0x3a4d8a, horizon: 0xf7b072, exposure: 0.95, lamps: 0.8, windows: 0.7, stars: 0, ambience: 'day' },
-  night: { sunEl: 50, sunAz: 120, sunColor: 0x8fa8ff, sunI: 0.28, hemiSky: 0x223355, hemiGround: 0x0b0f1a, hemiI: 0.35, fog: 0x0b1020, fogNear: 80, fogFar: 650, top: 0x04060e, horizon: 0x1a2340, exposure: 0.9, lamps: 2.2, windows: 1.4, stars: 1, ambience: 'night' },
+  day: { sunEl: 58, sunAz: 210, sunColor: 0xfff1dc, sunI: 2.8, hemiSky: 0x9ec9ff, hemiGround: 0x6b7a4b, hemiI: 1.25, fog: 0xcfe0f2, fogNear: 350, fogFar: 1600, top: 0x2f6fd0, horizon: 0xcfe3f7, exposure: 1.1, lamps: 0, windows: 0, stars: 0, pools: 0, ambience: 'day' },
+  // Sunset = about 6 pm: sun still 16 degrees up, warm but bright.
+  sunset: { sunEl: 16, sunAz: 262, sunColor: 0xffb56b, sunI: 2.5, hemiSky: 0xe8b48a, hemiGround: 0x5a553f, hemiI: 0.95, fog: 0xf4d6b4, fogNear: 320, fogFar: 1300, top: 0x4a63a8, horizon: 0xfacd94, exposure: 1.05, lamps: 1.0, windows: 0.8, stars: 0, pools: 0.55, ambience: 'day' },
+  // Night = deep blue sky, moonlit, with every street, garden and facade lit.
+  night: { sunEl: 48, sunAz: 120, sunColor: 0x9db4ff, sunI: 0.45, hemiSky: 0x2c4478, hemiGround: 0x12182a, hemiI: 0.55, fog: 0x121d38, fogNear: 120, fogFar: 750, top: 0x0a1430, horizon: 0x26396a, exposure: 0.95, lamps: 2.4, windows: 1.5, stars: 1, pools: 1, ambience: 'night' },
 };
 export const PRESET_ORDER = ['day', 'sunset', 'night'];
 
@@ -50,6 +52,8 @@ export function buildLighting(ctx) {
     renderer.toneMappingExposure = mix(a.exposure, b.exposure);
     if (ctx.lampHeadMat) ctx.lampHeadMat.emissiveIntensity = mix(a.lamps, b.lamps);
     if (ctx.glassMat) ctx.glassMat.emissiveIntensity = mix(a.windows, b.windows);
+    if (ctx.bodyMat) ctx.bodyMat.emissiveIntensity = mix(a.windows, b.windows) * 0.22;
+    const pools = mix(a.pools || 0, b.pools || 0); for (const m of ctx.poolMats || []) { m.opacity = pools * m.userData.maxOpacity; m.visible = pools > 0.02; }
     cur.night = mix(a.lamps, b.lamps) > 0.5;
     cur.ambience = blend > 0.5 ? b.ambience : a.ambience;
   };

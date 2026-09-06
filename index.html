@@ -57,19 +57,7 @@
   </div>
   <div id="pause" class="overlay hidden"><div class="panel"><h2>Paused</h2><div class="list"><button class="btn" data-act="resume">Resume</button><button class="btn" data-act="missions">Missions</button><button class="btn" data-act="settings">Settings</button><button class="btn" data-act="controls">Controls</button><button class="btn" data-act="restart">Restart at the gate</button></div></div></div>
   <div id="missions" class="overlay hidden"><div class="panel"><h2>Missions</h2><div id="mission-list"></div><div style="margin-top:14px"><button class="btn" data-act="abandon">Abandon current</button><button class="btn" data-act="close">Close</button></div></div></div>
-  <div id="settings" class="overlay hidden"><div class="panel"><h2>Settings</h2>
-    <div class="setting"><span>Quality</span><select id="s-quality"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
-    <div class="setting"><span>Time of day</span><select id="s-tod"><option value="day">Day</option><option value="sunset">Sunset</option><option value="night">Night</option></select></div>
-    <div class="setting"><span>Master volume</span><input id="s-master" type="range" min="0" max="100"></div>
-    <div class="setting"><span>Engine volume</span><input id="s-engine" type="range" min="0" max="100"></div>
-    <div class="setting"><span>Ambience volume</span><input id="s-ambience" type="range" min="0" max="100"></div>
-    <div class="setting"><span>Vehicle</span><select id="s-vehicle"><option value="car">Car (SUV)</option><option value="plane">Charter plane</option></select></div>
-    <div class="setting"><span>Flight assist</span><select id="s-assist"><option value="full">Full (auto-level, stall protection)</option><option value="light">Light</option><option value="off">Off</option></select></div>
-    <div class="setting"><span>Flight pitch</span><select id="s-pitch"><option value="pilot">Pilot: ↓ pulls the nose up</option><option value="arcade">Arcade: ↑ pulls the nose up</option></select></div>
-    <div class="setting"><span>Chase distance</span><select id="s-chase"><option value="near">Near</option><option value="normal">Normal</option><option value="far">Far</option></select></div>
-    <div class="setting"><span>Invert steering</span><input id="s-invert" type="checkbox"></div>
-    <div class="setting"><span>Minimap</span><select id="s-minimap"><option value="north">North-up</option><option value="rotate">Rotating</option></select></div>
-    <div style="margin-top:14px"><button class="btn" data-act="close">Close</button></div><div style="font-size:11px;color:rgba(245,245,245,0.5);margin-top:10px">Quality changes apply after reload.</div></div></div>
+  <div id="settings" class="overlay gs-overlay hidden"></div>
   <div id="teleport" class="overlay hidden"><div class="panel"><h2>Teleport to plot</h2><input id="tp-input" placeholder="villa 245, farm 12, th 83, commercial 7, temple, lake…" autocomplete="off"><div id="tp-list"></div><div style="margin-top:10px;font-size:12px;color:rgba(245,245,245,0.6)">Enter to go · Esc to close</div></div></div>
   <div id="bigmap" class="hidden"><canvas id="bigmap-canvas" width="1600" height="1600"></canvas><div id="fly-bar" class="panel hidden"><span id="fly-text">Pick a spot</span><button id="fly-btn" class="btn gold small">Fly there</button></div><div class="hint">Click anywhere on the map to pick a destination · M or Esc closes · <a href="https://gvp-smart-village-plan.vercel.app" target="_blank" rel="noopener">2D plan viewer</a></div></div>
   <div id="complete"><div class="panel"><h2 id="complete-title">Complete</h2><div id="complete-body"></div><button class="btn gold" data-act="driveon">Drive on</button><button class="btn" data-act="next">Missions</button></div></div>

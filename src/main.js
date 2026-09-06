@@ -34,6 +34,7 @@ import { buildAirstrip } from './world/airstrip.js';
 import { buildHorizon } from './world/horizon.js';
 import { Vehicles } from './game/vehicles.js';
 import { UI } from './ui/hud.js';
+import { SettingsScreen } from './ui/settingsScreen.js';
 import { clamp, lerp } from './util/math.js';
 
 const settings = new Settings();
@@ -161,7 +162,7 @@ async function boot() {
   const overlays = { pause: $('pause'), missions: $('missions'), settings: $('settings'), teleport: $('teleport'), bigmap: $('bigmap') };
   function openOverlay(name) {
     closeOverlay();
-    G.overlay = name; overlays[name].classList.remove('hidden'); input.enabled = false; input.clear();
+    G.overlay = name; if (name !== 'settings') overlays[name].classList.remove('hidden'); input.enabled = false; input.clear();
     if (G.phase === 'drive') loop.paused = true;
     if (name === 'missions') renderMissionList();
     if (name === 'settings') syncSettingsUI();
@@ -170,7 +171,7 @@ async function boot() {
   }
   function closeOverlay() {
     if (!G.overlay) return;
-    overlays[G.overlay].classList.add('hidden'); G.overlay = null; input.enabled = G.phase === 'drive';
+    if (G.overlay === 'settings') settingsScreen.hide(); else overlays[G.overlay].classList.add('hidden'); G.overlay = null; input.enabled = G.phase === 'drive';
     if (G.phase === 'drive' && !document.hidden) loop.paused = false;
   }
   function renderMissionList() {
@@ -205,20 +206,26 @@ async function boot() {
     if (e.key === 'Escape') { closeOverlay(); e.stopPropagation(); }
     e.stopPropagation();
   });
-  function syncSettingsUI() {
-    $('s-quality').value = settings.get('quality'); $('s-tod').value = ctx.lighting.name; $('s-master').value = settings.get('master'); $('s-engine').value = settings.get('engine'); $('s-ambience').value = settings.get('ambience');
-    $('s-chase').value = settings.get('chaseDistance'); $('s-invert').checked = settings.get('invertSteer'); $('s-minimap').value = settings.get('minimapMode');
-    $('s-vehicle').value = G.flying ? 'plane' : 'car'; $('s-assist').value = settings.get('flightAssist'); $('s-pitch').value = settings.get('pitchMode');
-  }
-  $('s-quality').onchange = (e) => settings.set('quality', e.target.value);
-  $('s-tod').onchange = (e) => { settings.set('timeOfDay', e.target.value); ctx.lighting.set(e.target.value); };
-  for (const k of ['master', 'engine', 'ambience']) $(`s-${k}`).oninput = (e) => { settings.set(k, +e.target.value); audio.applyVolumes(); };
-  $('s-chase').onchange = (e) => settings.set('chaseDistance', e.target.value);
-  $('s-invert').onchange = (e) => { settings.set('invertSteer', e.target.checked); input.invertSteer = e.target.checked; };
-  $('s-minimap').onchange = (e) => { settings.set('minimapMode', e.target.value); minimap.mode = e.target.value; };
-  $('s-vehicle').onchange = (e) => { const want = e.target.value; if (G.phase !== 'drive') { settings.set('vehicle', want); return; } if (want === 'plane') enterPlane(); else exitPlane(); };
-  $('s-assist').onchange = (e) => { settings.set('flightAssist', e.target.value); plane.assist = e.target.value; };
-  $('s-pitch').onchange = (e) => { settings.set('pitchMode', e.target.value); input.invertPitch = e.target.value === 'arcade'; };
+  // Game-style settings screen (src/ui/settingsScreen.js); the old select rows are gone.
+  const settingsScreen = new SettingsScreen($('settings'), {
+    get: (k) => settings.get(k), set: (k, v) => settings.set(k, v),
+    state: () => ({ vehicle: G.phase === 'drive' ? (G.flying ? 'plane' : 'car') : settings.get('vehicle'), tod: ctx.lighting.name, quality: settings.get('quality') }),
+    onVehicle: (want) => { if (G.phase !== 'drive') { settings.set('vehicle', want); return; } if (want === 'plane') enterPlane(); else exitPlane(); },
+    onTod: (v) => { settings.set('timeOfDay', v); ctx.lighting.set(v); },
+    onQuality: (v) => settings.set('quality', v),
+    onReload: () => location.reload(),
+    onAudio: () => audio.applyVolumes(),
+    onMute: (m) => audio.setMuted(m),
+    onChase: (v) => settings.set('chaseDistance', v),
+    onInvert: (b) => { settings.set('invertSteer', b); input.invertSteer = b; },
+    onMinimap: (v) => { settings.set('minimapMode', v); minimap.mode = v; },
+    onAssist: (v) => { settings.set('flightAssist', v); plane.assist = v; },
+    onPitch: (v) => { settings.set('pitchMode', v); input.invertPitch = v === 'arcade'; },
+    onClose: () => { audio.click(); closeOverlay(); },
+    onDefaults: () => { for (const k of ['master', 'engine', 'ambience', 'chaseDistance', 'invertSteer', 'minimapMode', 'flightAssist', 'pitchMode', 'quality']) settings.set(k, settings.defaults[k]); audio.applyVolumes(); input.invertSteer = false; input.invertPitch = false; minimap.mode = 'north'; plane.assist = 'full'; settingsScreen.refresh(); ui.toast('Settings restored to defaults.', 3); },
+  }, ctx);
+  ctx.carVisual = carVisual;
+  function syncSettingsUI() { settingsScreen.show(); }
   document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
     const act = b.dataset.act; audio.click();
     if (act === 'resume' || act === 'close') closeOverlay();
@@ -377,6 +384,7 @@ async function boot() {
     for (const fn of ctx.animate) fn(dt, simTime);
     updateLOD(ctx, camera.position);
     renderer.render(scene, camera);
+    settingsScreen.tick(dt, performance.now() / 1000);
   }
   const loop = new Loop(sim, render);
   ui.hideLoading(); ui.showTitle(settings.get('bestLap'));

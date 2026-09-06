@@ -7,7 +7,7 @@ const DEFAULTS = {
 const KEY = 'svd-settings-v1';
 export class Settings {
   constructor() {
-    this.data = { ...DEFAULTS };
+    this.data = { ...DEFAULTS }; this.defaults = DEFAULTS;
     this.listeners = [];
     try { const raw = localStorage.getItem(KEY); if (raw) Object.assign(this.data, JSON.parse(raw)); } catch (_) { /* private mode */ }
     const q = new URLSearchParams(location.search);

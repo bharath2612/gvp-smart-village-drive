@@ -115,3 +115,7 @@ h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; font-weight: 600; 
 #fly-bar { display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 18px; margin-top: 10px; font-size: 14px; }
 #fly-bar .btn { margin: 0; }
 @media (max-width: 900px) { #mm-zoom { left: 66px; bottom: 26px; } }
+
+#boat-prompt { position: absolute; bottom: 116px; left: 50%; transform: translate(-50%, 20px); display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 18px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; border-color: rgba(201,162,39,0.5); }
+#boat-prompt.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+#boat-prompt .btn { margin: 0; }

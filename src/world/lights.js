@@ -104,6 +104,20 @@ export function buildLights(ctx) {
     for (const [dx, dz] of spots) for (const rot of [0, Math.PI / 2]) { const m = new THREE.Mesh(beamGeo, beamMat); m.position.set(cx + dx, 0, tz + dz); m.rotation.y = rot; beams.add(m); }
     beams.name = 'temple-beams'; scene.add(beams);
   }
+  // Lake: marina gate and pier lanterns, boathouse, boardwalk lamps, island pavilion, lighthouse, fountain glow, buoys.
+  if (ctx.marina) {
+    const m = ctx.marina; const lp = [];
+    lp.push({ x: m.gate.x + 3, z: m.gate.z, sx: 16, sy: 1, sz: 16 });
+    for (let x = 2200; x <= 2228; x += 7) for (const sgn of [-1, 1]) lp.push({ x, z: m.gate.z + sgn * 2, sx: 6, sy: 1, sz: 6 });
+    lp.push({ x: m.boathouse.x, z: m.boathouse.z, sx: 18, sy: 1, sz: 16 });
+    for (let x = 2320; x < 2850; x += 24) lp.push({ x, z: world.lake.bbox.y + world.lake.bbox.h - 5.5, sx: 9, sy: 1, sz: 9 });
+    for (const i of ctx.islands || []) lp.push({ x: i.x, z: i.z, sx: i.r * 2.2, sy: 1, sz: i.r * 2.2 });
+    lp.push({ x: 2848, z: 2848, sx: 22, sy: 1, sz: 22 });
+    for (const b of ctx.buoys || []) lp.push({ x: b.x, z: b.z, sx: 5, sy: 1, sz: 5 });
+    scene.add(instancedChunks(disc, streetMat, lp, { name: 'light-pools-lake', chunk: 1000 }));
+    const fountainMat = poolMaterial(ctx, warm, 0.8, 0xbfe8ff);
+    scene.add(instancedChunks(disc, fountainMat, [{ x: 2583, z: 2505, sx: 34, sy: 1, sz: 34 }], { name: 'light-pools-fountain', chunk: 1000 }));
+  }
   // Gate house and temple plinth wash.
   const gate = [{ x: 1500, z: 2985, sx: 40, sy: 1, sz: 24 }];
   if (temple) gate.push({ x: temple.x + temple.w / 2, z: temple.y + temple.h / 2, sx: 80, sy: 1, sz: 80 });

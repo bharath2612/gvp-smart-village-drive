@@ -27,6 +27,7 @@ import { Missions, fmtTime } from './game/missions.js';
 import { loadPlotData } from './game/plots.js';
 import { Minimap } from './ui/minimap.js';
 import { CarSwap } from './game/swap.js';
+import { BoatModel, BoatVisual } from './boat/boat.js';
 import { UI } from './ui/hud.js';
 import { clamp, lerp } from './util/math.js';
 
@@ -92,6 +93,28 @@ async function boot() {
   const rig = new CameraRig(camera, settings);
   const missions = new Missions(scene, world, settings, audio, ui);
   const swap = new CarSwap(ctx, car, carVisual, rig, ui, audio);
+  // Boating: park the car at the marina, take the motor boat from the pier, return the same way.
+  const boat = new BoatModel(ctx); const boatVisual = new BoatVisual(scene, ctx);
+  const veh = () => (G.boating ? boat : car);
+  function enterBoat() {
+    if (G.boating) return; const m = ctx.marina;
+    car.reset(m.park.x, m.park.z, m.park.yaw); car.frozen = true; carVisual.update(0, car, 1, input, simTime);
+    boat.reset(m.pierEnd.x, m.pierEnd.z, m.pierEnd.yaw); boatVisual.root.visible = true; G.boating = true;
+    rig.setMode('chase'); rig.snapTo(boat); ui.hideCard(); ui.showSwapPrompt(null);
+    audio.click(); ui.toast('Welcome aboard. W/S throttle, A/D rudder, C changes view. Return to the pier and press B to get back to your car.', 6);
+  }
+  function exitBoat() {
+    if (!G.boating) return; const m = ctx.marina;
+    boat.reset(m.pierEnd.x, m.pierEnd.z, m.pierEnd.yaw); boatVisual.root.visible = false; G.boating = false;
+    car.frozen = false; rig.setMode('chase'); rig.snapTo(car); audio.click(); ui.toast('Back on dry land.', 3);
+  }
+  function updateBoatPrompt() {
+    const m = ctx.marina;
+    if (G.boating) { const d = Math.hypot(boat.x - m.pierEnd.x, boat.z - m.pierEnd.z); ui.showBoatPrompt(d < 12 && Math.abs(boat.speed) * 3.6 < 8 ? 'Dock and return to your car?' : null, 'Dock · B'); }
+    else { const d = Math.hypot(car.x - m.gate.x, car.z - m.gate.z); ui.showBoatPrompt(d < 14 && Math.abs(car.speed) * 3.6 < 8 ? 'Take a motor boat out on the lake?' : null, 'Yes · B'); }
+  }
+  input.on('boat', () => { if (G.phase !== 'drive' || G.overlay) return; if (G.boating) { if (Math.hypot(boat.x - ctx.marina.pierEnd.x, boat.z - ctx.marina.pierEnd.z) < 12) exitBoat(); else ui.toast('Return to the marina pier to dock.', 3); } else if (Math.hypot(car.x - ctx.marina.gate.x, car.z - ctx.marina.gate.z) < 14) enterBoat(); });
+  $('boat-btn').onclick = () => { if (G.boating) exitBoat(); else enterBoat(); };
   input.on('swap', () => { if (G.phase === 'drive' && !G.overlay) swap.swap(); });
   $('swap-btn').onclick = () => swap.swap();
   const minimap = new Minimap(world, $('minimap'), $('bigmap-canvas'));
@@ -101,13 +124,14 @@ async function boot() {
 
   // ---------------------------------------------------------------- state
   let simTime = 0, lastNearestPick = null;
-  const G = { phase: 'title', titleT: 0, swoopT: 0, paused: false, overlay: null, resumeCount: 0, lakeSeq: null, nearestTimer: 0, stillTimer: 0, autoQ: { t: 0, samples: 0, sum: 0, done: qualityName !== 'medium' || settings.get('quality') !== 'auto' } };
+  const G = { boating: false, phase: 'title', titleT: 0, swoopT: 0, paused: false, overlay: null, resumeCount: 0, lakeSeq: null, nearestTimer: 0, stillTimer: 0, autoQ: { t: 0, samples: 0, sum: 0, done: qualityName !== 'medium' || settings.get('quality') !== 'auto' } };
   const gateStart = () => { car.reset(CONFIG.world.gate.x - 6, CONFIG.world.gate.y - 14, 0); };
   gateStart();
   const at = new URLSearchParams(location.search).get('at');
   if (at && world.byId.get(at)) teleportTo(world.byId.get(at));
 
   function teleportTo(plot) {
+    if (G.boating) exitBoat();
     // Prefer the road the plot faces (its street), so the car lands in front of it.
     const pl = plot.road ? placeOnRoad(plot.road, plot.cx, plot.cy) : roadPlacement(world, plot.cx, plot.cy);
     // Face along the road towards the plot's side.
@@ -216,6 +240,7 @@ async function boot() {
   });
   $('fly-btn').onclick = () => { const p = minimap.mark; if (!p) return; closeOverlay(); startFlight(p.x, p.z); audio.click(); };
   function startFlight(x, z) {
+    if (G.boating) exitBoat();
     const pl = roadPlacement(world, x, z);
     const dx = x - pl.x, dz = z - pl.y; let yaw = pl.yaw;
     if (pl.road.horizontal) yaw = dx >= 0 ? Math.PI / 2 : -Math.PI / 2; else yaw = dz >= 0 ? Math.PI : 0;
@@ -230,7 +255,7 @@ async function boot() {
 
   // ---------------------------------------------------------------- actions
   input.on('camera', () => { if (G.phase === 'drive' && !G.overlay) { rig.cycle(); audio.click(); } });
-  input.on('reset', () => { if (G.phase === 'drive' && !G.overlay) resetToRoad(); });
+  input.on('reset', () => { if (G.phase !== 'drive' || G.overlay) return; if (G.boating) { boat.reset(ctx.marina.pierEnd.x, ctx.marina.pierEnd.z, ctx.marina.pierEnd.yaw); rig.snapTo(boat); } else resetToRoad(); });
   input.on('timeOfDay', () => { if (!G.overlay) cycleTod(); });
   input.on('teleport', () => { if (G.phase === 'drive') openOverlay(G.overlay === 'teleport' ? null : 'teleport'); });
   input.on('map', () => { if (G.overlay === 'bigmap') closeOverlay(); else if (G.phase === 'drive') openOverlay('bigmap'); });
@@ -266,8 +291,8 @@ async function boot() {
     if (G.phase !== 'drive' || G.resumeCount > 0) return;
     car.handbrakeOn = input.handbrake;
     if (G.lakeSeq) { car.frozen = true; return; }
-    car.step(dt, input);
-    missions.update(dt, car);
+    if (G.boating) boat.step(dt, input); else car.step(dt, input);
+    missions.update(dt, veh());
   }
   // ---------------------------------------------------------------- render
   function render(dt, alpha) {
@@ -286,7 +311,7 @@ async function boot() {
     } else {
       // Resume countdown after a hidden tab.
       if (G.resumeCount > 0 && !G.overlay) { G.resumeT = (G.resumeT || 0) + dt; if (G.resumeT > 0.8) { G.resumeT = 0; G.resumeCount--; ui.showResume(G.resumeCount); if (G.resumeCount === 0) loop.paused = false; } }
-      for (const ev of car.takeEvents()) {
+      for (const ev of veh().takeEvents()) {
         if (ev.type === 'impact') { audio.thud(ev.strength); rig.addShake(ev.strength); carVisual.kick(ev.strength); }
         if (ev.type === 'bump') { audio.bump(); carVisual.kick(0.4 + ev.strength * 0.6); rig.addShake(0.15 + ev.strength * 0.3); }
         if (ev.type === 'hedge') audio.rustle();
@@ -303,19 +328,22 @@ async function boot() {
         camera.position.set(gx - fwd.x * 8 * (1 - u) - fwd.x * 8, h, gz - fwd.z * 8 * (1 - u) - fwd.z * 8); camera.up.set(0, 1, 0); camera.lookAt(gx + fwd.x * 6, 1, gz + fwd.z * 6);
         if (f.t >= f.dur) { car.reset(f.to.x, f.to.z, f.to.yaw); car.frozen = false; carVisual.root.visible = true; rig.snapTo(car); G.flight = null; ui.toast(`Landed in ${world.zoneOf(car.x, car.z)}.`, 3); }
       }
+      const v = veh();
       carVisual.update(dt, car, alpha, input, simTime);
-      if (!G.flight) rig.update(dt, car, alpha, input);
-      carVisual.setBodyVisible(rig.mode !== 'hood');
-      ctx.lighting.update(dt, car);
-      carVisual.setNight(ctx.lighting.isNight);
+      if (G.boating) boatVisual.update(dt, boat, alpha, input, simTime);
+      if (!G.flight) rig.update(dt, v, alpha, input);
+      carVisual.setBodyVisible(G.boating || rig.mode !== 'hood');
+      if (G.boating) boatVisual.setBodyVisible(rig.mode !== 'hood');
+      ctx.lighting.update(dt, v);
+      carVisual.setNight(ctx.lighting.isNight); boatVisual.setNight(ctx.lighting.isNight);
       audio.setAmbience(ctx.lighting.ambience);
-      audio.update(dt, { speed: car.speed, throttle: input.throttle, boosting: car.boosting, offroad: car.offroad, hedge: car.hedge, slip: car.telemetry.slip });
-      ui.update(dt, car, world, missions, ctx.lighting, rig.mode);
-      minimap.draw(car, missions.active ? missions.active.rings.filter((r, i) => !missions.done.has(i)) : [], missions.target());
+      audio.update(dt, { speed: v.speed, throttle: input.throttle, boosting: v.boosting, offroad: v.offroad, hedge: v.hedge, slip: v.telemetry.slip });
+      ui.update(dt, v, world, missions, ctx.lighting, rig.mode);
+      minimap.draw(v, missions.active ? missions.active.rings.filter((r, i) => !missions.done.has(i)) : [], missions.target());
       // Nearest plot every 0.25 s; card after 1 s stopped within 20 m.
       G.nearestTimer += dt;
-      if (G.nearestTimer > 0.25) { G.nearestTimer = 0; lastNearestPick = ui.updateNearest(car, world); swap.update(); }
-      const stopped = Math.abs(car.speed) < CONFIG.ui.plotCardSpeed;
+      if (G.nearestTimer > 0.25) { G.nearestTimer = 0; lastNearestPick = ui.updateNearest(v, world); if (!G.boating) swap.update(); updateBoatPrompt(); }
+      const stopped = Math.abs(v.speed) < CONFIG.ui.plotCardSpeed;
       G.stillTimer = stopped ? G.stillTimer + dt : 0;
       if (input.throttle > 0.5 && ui.cardPlot) ui.hideCard();
       if (G.stillTimer > CONFIG.ui.plotCardDelay && lastNearestPick && lastNearestPick.dist <= CONFIG.ui.plotCardRadius && !ui.cardPlot && !G.overlay) ui.showCard(lastNearestPick.plot, world);
@@ -334,6 +362,6 @@ async function boot() {
   const loop = new Loop(sim, render);
   ui.hideLoading(); ui.showTitle(settings.get('bestLap'));
   loop.start();
-  window.__svd = { car, world, ctx, rig, missions, settings, teleportTo, startDrive, finishSwoop, G, carVisual, loop, swap };
+  window.__svd = { car, world, ctx, rig, missions, settings, teleportTo, startDrive, finishSwoop, G, carVisual, loop, swap, boat, boatVisual, enterBoat, exitBoat };
 }
 boot().catch((e) => { console.error('[boot] ' + (e && e.stack ? e.stack : String(e))); ui.fatal((e && (e.message || e.stack)) || String(e)); });

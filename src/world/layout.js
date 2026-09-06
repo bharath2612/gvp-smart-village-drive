@@ -15,8 +15,49 @@ export async function loadLayout() {
   return derive(L);
 }
 
+// layout.json extracted the centre-column 10 m / 15 m roads as 900 m strips that start inside the neighbouring
+// column, so they overlap the 25 m roads and each other. Clip every residential road at the major roads it
+// crosses and drop segments that duplicate another road.
+function cleanRoads(raw) {
+  const all = raw.map((r) => ({ ...r, horizontal: r.w >= r.h }));
+  const majors = all.filter((r) => r.kind === '25m' || r.kind === 'spine');
+  const out = [];
+  for (const r of all) {
+    if (r.kind === '25m' || r.kind === 'spine') { out.push(r); continue; }
+    let segs = [{ ...r }];
+    for (const m of majors) {
+      if (m.horizontal === r.horizontal) continue;
+      const next = [];
+      for (const sgm of segs) {
+        if (r.horizontal) {
+          const o0 = Math.max(sgm.x, m.x), o1 = Math.min(sgm.x + sgm.w, m.x + m.w);
+          if (o1 - o0 <= 0.5 || sgm.y + sgm.h <= m.y || sgm.y >= m.y + m.h) { next.push(sgm); continue; }
+          if (o0 - sgm.x > 20) next.push({ ...sgm, w: o0 - sgm.x });
+          if (sgm.x + sgm.w - o1 > 20) next.push({ ...sgm, x: o1, w: sgm.x + sgm.w - o1 });
+        } else {
+          const o0 = Math.max(sgm.y, m.y), o1 = Math.min(sgm.y + sgm.h, m.y + m.h);
+          if (o1 - o0 <= 0.5 || sgm.x + sgm.w <= m.x || sgm.x >= m.x + m.w) { next.push(sgm); continue; }
+          if (o0 - sgm.y > 20) next.push({ ...sgm, h: o0 - sgm.y });
+          if (sgm.y + sgm.h - o1 > 20) next.push({ ...sgm, y: o1, h: sgm.y + sgm.h - o1 });
+        }
+      }
+      segs = next;
+    }
+    segs.forEach((sgm, i) => out.push({ ...sgm, id: segs.length > 1 ? `${r.id}-${i + 1}` : r.id }));
+  }
+  // Drop segments that duplicate an earlier one (same axis, overlapping by more than 5 m along it).
+  const kept = [];
+  for (const r of out) {
+    const dup = kept.some((k) => k.horizontal === r.horizontal && k.kind !== '25m' && k.kind !== 'spine' && r.kind !== '25m' && r.kind !== 'spine' &&
+      (r.horizontal ? Math.abs(k.y - r.y) < 3 && Math.min(k.x + k.w, r.x + r.w) - Math.max(k.x, r.x) > 5 : Math.abs(k.x - r.x) < 3 && Math.min(k.y + k.h, r.y + r.h) - Math.max(k.y, r.y) > 5));
+    if (!dup) kept.push(r);
+  }
+  console.log(`[layout] roads: ${raw.length} raw -> ${out.length} segments after clipping at major roads -> ${kept.length} after dropping ${out.length - kept.length} duplicates`);
+  return kept;
+}
+
 function derive(L) {
-  const roads = L.roads.map((r) => ({ ...r, horizontal: r.w >= r.h }));
+  const roads = cleanRoads(L.roads);
   const plots = [];
   const addPlot = (p) => { plots.push(p); return p; };
 

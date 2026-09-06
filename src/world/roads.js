@@ -63,7 +63,7 @@ export function buildRoads(ctx) {
         }
       }
       if (path) {
-        const va = a === 0 ? 0 : a + 3, vb = b === len ? len : b - 3;
+        const va = a === 0 ? 0 : a + 1, vb = b === len ? len : b - 1;
         if (vb - va >= 6) {
           footpaths.push(along(va, path / 2, 0.11, path, vb - va)); footpaths.push(along(va, wid - path / 2, 0.11, path, vb - va));
           for (const side of [path, wid - path]) kerbs.push(r.horizontal ? box(vb - va, 0.14, 0.22, 0xc9c5bb, { x: r.x + va + (vb - va) / 2, z: r.y + side }) : box(0.22, 0.14, vb - va, 0xc9c5bb, { x: r.x + side, z: r.y + va + (vb - va) / 2 }));
@@ -104,6 +104,36 @@ export function buildRoads(ctx) {
         kerbs.push(box(8.3, 0.22, 0.3, 0xb9b7b0, { x: cx, z: z })); kerbs.push(box(8.3, 0.22, 0.3, 0xb9b7b0, { x: cx, z: z + segLen }));
         colliders.add(cx - 4.2, z, cx + 4.2, z + segLen, 'median');
         ctx.medianSegments = ctx.medianSegments || []; ctx.medianSegments.push({ x: cx, z0: z, z1: z + segLen });
+      }
+    }
+  }
+  // Corner bulbs: a quarter-disc of cobbles with a curved kerb at every junction corner of a residential street,
+  // so the footpaths of the two streets wrap round the corner instead of stopping short.
+  {
+    const R = 4.2;
+    const arc = (sx, sz) => (sz > 0 ? (sx > 0 ? -Math.PI / 2 : Math.PI) : (sx > 0 ? 0 : Math.PI / 2));
+    const seen = new Set();
+    for (const r of roads) {
+      if (r.kind === 'spine' || r.kind === '25m') continue;
+      for (const o of roads) {
+        if (o === r || o.horizontal === r.horizontal) continue;
+        const hz = r.horizontal ? r : o, vt = r.horizontal ? o : r;
+        const ix0 = Math.max(hz.x, vt.x), ix1 = Math.min(hz.x + hz.w, vt.x + vt.w), iz0 = Math.max(hz.y, vt.y), iz1 = Math.min(hz.y + hz.h, vt.y + vt.h);
+        if (ix1 - ix0 < -0.5 || iz1 - iz0 < -0.5) continue;
+        if (ix1 - ix0 <= 0.5 && iz1 - iz0 <= 0.5) continue;
+        // Corners of the junction rectangle; the bulb bulges into the junction (towards its centre).
+        const cx = (ix0 + ix1) / 2, cz = (iz0 + iz1) / 2;
+        for (const [px, pz] of [[ix0, iz0], [ix1, iz0], [ix0, iz1], [ix1, iz1]]) {
+          // Skip corners that lie inside a 25 m road / spine carriageway (the major road dominates there).
+          if (roads.some((m) => (m.kind === '25m' || m.kind === 'spine') && px > m.x + 3 && px < m.x + m.w - 3 && pz > m.y + 3 && pz < m.y + m.h - 3)) continue;
+          const key = `${px.toFixed(1)},${pz.toFixed(1)}`; if (seen.has(key)) continue; seen.add(key);
+          const sx = Math.sign(cx - px) || 1, sz = Math.sign(cz - pz) || 1;
+          const disc = new THREE.CircleGeometry(R, 14, arc(sx, sz), Math.PI / 2); disc.rotateX(-Math.PI / 2); disc.translate(px, 0.115, pz);
+          const uv = disc.attributes.uv, pos = disc.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / 1, pos.getZ(i) / 1);
+          footpaths.push(disc);
+          const kerb = new THREE.TorusGeometry(R, 0.11, 5, 14, Math.PI / 2); kerb.rotateZ(arc(sx, sz)); kerb.rotateX(-Math.PI / 2); kerb.translate(px, 0.1, pz);
+          const col = new Float32Array(kerb.attributes.position.count * 3).fill(0.79); kerb.setAttribute('color', new THREE.BufferAttribute(col, 3)); kerbs.push(kerb);
+        }
       }
     }
   }

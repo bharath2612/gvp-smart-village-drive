@@ -34,14 +34,14 @@ h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; font-weight: 600; 
 #top-right .btn { margin: 0; padding: 8px 12px; font-size: 13px; }
 #mission-timer { position: absolute; top: 66px; right: 18px; padding: 8px 14px; font-size: 13px; color: var(--gold); opacity: 0; transition: opacity 0.3s; }
 #mission-timer.show { opacity: 1; }
-#speedo { position: absolute; right: 18px; bottom: 18px; padding: 10px 12px 8px; text-align: center; }
+#speedo { position: absolute; right: 18px; bottom: 18px; padding: 0; text-align: center; background: none; border: none; backdrop-filter: none; }
 #gauge { display: block; width: 220px; height: 220px; }
 #speed { font-size: 46px; font-weight: 600; line-height: 1; font-family: 'Playfair Display', serif; }
 #speedo .unit { font-size: 11px; letter-spacing: 0.2em; color: rgba(245,245,245,0.6); }
 #boost { height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; margin-top: 10px; }
 #boost-bar { height: 100%; width: 100%; background: var(--gold); transition: width 0.1s; }
 #boost-bar.active { background: #fff; box-shadow: 0 0 10px #fff; }
-#speedo .row { display: flex; justify-content: space-between; margin-top: 4px; font-size: 12px; color: rgba(245,245,245,0.7); }
+#speedo .row { display: flex; justify-content: space-between; margin-top: 2px; padding: 0 28px; font-size: 12px; color: rgba(245,245,245,0.75); text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
 #gear { font-weight: 600; color: var(--text); }
 #hb { opacity: 0.3; } #hb.on { opacity: 1; color: #ff6b6b; }
 #cam-mode { text-transform: capitalize; }

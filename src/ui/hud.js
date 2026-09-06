@@ -23,7 +23,7 @@ export class UI {
     const ang = (v) => a0 + sweep * Math.min(Math.max(v / MAX, 0), 1);
     this.needle += (kmh - this.needle) * Math.min(1, dt * 10);
     g.save(); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, S, S);
-    g.beginPath(); g.arc(cx, cy, R + 10, 0, Math.PI * 2); g.fillStyle = 'rgba(5,8,16,0.55)'; g.fill();
+    g.beginPath(); g.arc(cx, cy, R + 12, 0, Math.PI * 2); g.fillStyle = 'rgba(8,12,22,0.78)'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = 'rgba(201,162,39,0.45)'; g.stroke();
     g.lineCap = 'round';
     g.beginPath(); g.arc(cx, cy, R, a0, a0 + sweep); g.strokeStyle = 'rgba(255,255,255,0.14)'; g.lineWidth = 6; g.stroke();
     g.beginPath(); g.arc(cx, cy, R, ang(140), a0 + sweep); g.strokeStyle = 'rgba(220,60,50,0.75)'; g.lineWidth = 6; g.stroke();

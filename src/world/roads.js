@@ -97,10 +97,10 @@ export function buildRoads(ctx) {
     if (isSpine) {
       // Two 11 m carriageways with dashed lines, an 8 m planted median with kerbs, U-turn gaps every 200 m.
       const cx = r.x + r.w / 2;
-      for (const [a, b] of segs) for (let t = a + 2; t < b - 3; t += 9) { marks.push(along(t, 5.5, 0.09, 0.15, 3)); marks.push(along(t, wid - 5.5, 0.09, 0.15, 3)); }
-      for (let z = r.y + 15; z < r.y + r.h - 15; z += 200) {
-        const segLen = Math.min(190, r.y + r.h - 15 - z);
-        if (segLen < 20) break;
+      for (const [a, b] of segs) for (let t = a + 2; t < b - 3; t += 9) { marks.push(along(t, 7.0, 0.09, 0.15, 3)); marks.push(along(t, wid - 7.0, 0.09, 0.15, 3)); }
+      for (const [ma, mb] of subtract(len, junctionIntervals(r, roads, () => 4))) {
+        const z = r.y + Math.max(ma, 15), segLen = r.y + Math.min(mb, len - 15) - z;
+        if (segLen < 20) continue;
         medians.push(patchGeo(cx - 4, z, 8, segLen, 4, 0.2));
         kerbs.push(box(0.3, 0.22, segLen, 0xb9b7b0, { x: cx - 4, z: z + segLen / 2 }));
         kerbs.push(box(0.3, 0.22, segLen, 0xb9b7b0, { x: cx + 4, z: z + segLen / 2 }));
@@ -112,17 +112,27 @@ export function buildRoads(ctx) {
   }
   // Junction corners. In local corner coordinates (u along x, v along z, both pointing INTO the junction) the
   // horizontal road's kerb line is v = oA and the vertical road's kerb line is u = oB. The block corner is rounded
-  // with an arc of radius R tangent to both kerb lines, centred at (oB - R, oA - R) inside the block, so the
-  // footpath sweeps round the corner and the carriageway gains the fillet. Strips end where the arc starts.
+  // with an arc of radius R tangent to both kerb lines, centred at (oB - R, oA - R) inside the block, so the strips
+  // sweep round the corner and the carriageway gains the fillet. The piece is split on its diagonal: the half next
+  // to each road carries that road's material (cobbles for a footpath, grass for a verge), so a footpath flows into
+  // a verge with no gap. Strips end exactly where the arc begins.
   {
     const R = CORNER_R;
     const arcStart = (sx, sz) => (sz > 0 ? (sx > 0 ? -Math.PI / 2 : Math.PI) : (sx > 0 ? 0 : Math.PI / 2));
+    const listFor = (q) => (q.kind === '25m' || q.kind === 'spine' ? verges : footpaths);
+    const yFor = (q) => (q.kind === '25m' || q.kind === 'spine' ? 0.075 : 0.115);
+    const piece = (pts, sx, sz, px, pz, y, tile) => {
+      const shape = new THREE.Shape(pts.map(([u, v]) => new THREE.Vector2(sx * u, -sz * v)));
+      const g = new THREE.ShapeGeometry(shape); g.rotateX(-Math.PI / 2); g.translate(px, y, pz);
+      const uv = g.attributes.uv, pos = g.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / tile, pos.getZ(i) / tile);
+      return g;
+    };
     const seen = new Set();
     for (const r of roads) {
-      if (!(r.kind === '10m' || r.kind === '15m' || r.kind === '20m')) continue;
+      if (!r.horizontal) continue;
       for (const o of roads) {
-        if (o === r || o.horizontal === r.horizontal) continue;
-        const hz = r.horizontal ? r : o, vt = r.horizontal ? o : r;
+        if (o.horizontal) continue;
+        const hz = r, vt = o;
         const ix0 = Math.max(hz.x, vt.x), ix1 = Math.min(hz.x + hz.w, vt.x + vt.w), iz0 = Math.max(hz.y, vt.y), iz1 = Math.min(hz.y + hz.h, vt.y + vt.h);
         if (ix1 - ix0 < -0.5 || iz1 - iz0 < -0.5) continue;
         if (ix1 - ix0 <= 0.5 && iz1 - iz0 <= 0.5) continue;
@@ -132,13 +142,14 @@ export function buildRoads(ctx) {
           const key = `${px.toFixed(1)},${pz.toFixed(1)}`; if (seen.has(key)) continue; seen.add(key);
           const sx = px < vcx ? 1 : -1, sz = pz < hcz ? 1 : -1;
           const cu = oB - R, cv = oA - R;
-          const pts = [];
-          for (let i = 0; i <= 14; i++) { const t = (i / 14) * Math.PI / 2; pts.push([cu + R * Math.cos(t), cv + R * Math.sin(t)]); }
-          pts.push([cu, 0], [0, 0], [0, cv]);
-          const shape = new THREE.Shape(pts.map(([u, v]) => new THREE.Vector2(sx * u, -sz * v)));
-          const g = new THREE.ShapeGeometry(shape); g.rotateX(-Math.PI / 2); g.translate(px, 0.115, pz);
-          const uv = g.attributes.uv, pos = g.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i), pos.getZ(i));
-          (hz.kind === '25m' || hz.kind === 'spine' || vt.kind === '25m' || vt.kind === 'spine' ? footpaths : footpaths).push(g);
+          const arc = (t) => [cu + R * Math.cos(t), cv + R * Math.sin(t)];
+          const half = Math.PI / 4, N = 8;
+          // Half next to the vertical road's strip (from its kerb line up to the diagonal).
+          const pB = []; for (let i = 0; i <= N; i++) pB.push(arc((i / N) * half)); pB.push([0, 0], [0, cv]);
+          // Half next to the horizontal road's strip (from the diagonal round to its kerb line).
+          const pA = []; for (let i = 0; i <= N; i++) pA.push(arc(half + (i / N) * half)); pA.push([cu, 0], [0, 0]);
+          listFor(vt).push(piece(pB, sx, sz, px, pz, yFor(vt), listFor(vt) === verges ? 4 : 1));
+          listFor(hz).push(piece(pA, sx, sz, px, pz, yFor(hz), listFor(hz) === verges ? 4 : 1));
           const kerb = new THREE.TorusGeometry(R, 0.11, 5, 16, Math.PI / 2); kerb.rotateZ(arcStart(sx, sz)); kerb.rotateX(-Math.PI / 2); kerb.translate(px + sx * cu, 0.1, pz + sz * cv);
           const col = new Float32Array(kerb.attributes.position.count * 3).fill(0.79); kerb.setAttribute('color', new THREE.BufferAttribute(col, 3)); kerbs.push(kerb);
         }

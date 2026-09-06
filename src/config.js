@@ -5,6 +5,12 @@ export const CONFIG = {
   salesEmail: 'rkreddyzoomin@gmail.com',
   planViewerUrl: 'https://gvp-smart-village-plan.vercel.app',
   expectedCounts: { farms: 564, villas: 560, townhouses: 504, commercial: 70, parks: 4 },
+  car: {
+    // Drop a CC0 GLB of your own (e.g. the Meshy Honda SUV) at public/models/suv.glb and it is used instead of the Kenney SUV.
+    // Wheels are found by node names containing "wheel" (front/back); the paint colour (dominant vertex colour) is replaced by brandColor.
+    overrideModel: '/models/suv.glb', model: '/models/cars/suv.glb', length: 4.7,
+  },
+  lodDistance: 380,
   world: { size: 3000, outside: 320, wallHeight: 6.1, wallThickness: 0.4, gate: { x: 1500, y: 3000 } },
   handling: {
     topSpeed: 33.3,        // m/s (120 km/h)

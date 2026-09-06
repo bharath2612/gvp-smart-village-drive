@@ -14,10 +14,12 @@ import { buildWall } from './world/wall.js';
 import { buildBuildings } from './world/buildings.js';
 import { buildAmenities } from './world/amenities.js';
 import { buildLake } from './world/lake.js';
-import { buildVegetation } from './world/vegetation.js';
+import { buildVegetation, updateLOD } from './world/vegetation.js';
+import { buildProps } from './world/props.js';
+import { loadModelSet } from './world/models.js';
 import { buildLighting, PRESET_ORDER } from './world/lighting.js';
 import { CarModel } from './car/model.js';
-import { CarVisual } from './car/visual.js';
+import { CarVisual, loadCarModel } from './car/visual.js';
 import { CameraRig } from './car/camera.js';
 import { Missions, fmtTime } from './game/missions.js';
 import { loadPlotData } from './game/plots.js';
@@ -51,6 +53,16 @@ async function boot() {
   await loadPlotData();
   const colliders = new ColliderGrid(50);
   const ctx = { scene, renderer, camera, world, colliders, qualityPreset: Q, qualityName, animate: [] };
+  // CC0 models (Kenney kits, ~1.7 MB total) load before the world is generated; the game still works if any fail.
+  ui.setLoading(0.03, 'Loading CC0 models…');
+  const MODEL_LIST = [
+    ['tree_default', 9], ['tree_oak', 11], ['tree_detailed', 12], ['tree_fat', 9], ['tree_tall', 13], ['tree_palmDetailedTall', 12], ['tree_palmBend', 9],
+    ['plant_bushDetailed', 1.1], ['flower_redA', 0.55], ['flower_yellowA', 0.55], ['flower_purpleA', 0.55], ['pot_large', 1.1], ['rock_largeA', 1.6], ['log_stack', 1.2], ['statue_column', 4],
+  ].map(([key, height]) => ({ key, url: `/models/nature/${key}.glb`, height }));
+  for (const [key, length] of [['sedan', 4.4], ['suv-luxury', 4.7], ['hatchback-sports', 4.2], ['van', 4.9], ['sedan-sports', 4.5], ['taxi', 4.5]]) MODEL_LIST.push({ key, url: `/models/cars/${key}.glb`, length });
+  const [models, carModel] = await Promise.all([loadModelSet(MODEL_LIST, (p) => ui.setLoading(0.03 + p * 0.1)), loadCarModel()]);
+  ctx.models = models; ctx.lodDistance = new URLSearchParams(location.search).get('lod') === 'off' ? 1e9 : CONFIG.lodDistance;
+  console.log('[models] loaded', Object.keys(models).length, 'car', !!carModel);
   const steps = [
     ['Painting textures…', () => { ctx.T = buildTextures(qualityName); }],
     ['Laying the ground…', () => buildGround(ctx)],
@@ -60,17 +72,18 @@ async function boot() {
     ['Temple, school, stadium, agro plant…', () => buildAmenities(ctx)],
     ['Filling the lake…', () => buildLake(ctx)],
     ['Planting trees, hedges and crops…', () => buildVegetation(ctx)],
+    ['Parking cars, planting flowers…', () => buildProps(ctx)],
     ['Lighting…', () => buildLighting(ctx)],
   ];
   const t0 = performance.now();
-  for (let i = 0; i < steps.length; i++) { ui.setLoading(0.05 + (i / steps.length) * 0.9, steps[i][0]); await nextFrame(); steps[i][1](); }
+  for (let i = 0; i < steps.length; i++) { ui.setLoading(0.15 + (i / steps.length) * 0.8, steps[i][0]); await nextFrame(); steps[i][1](); }
   console.log(`[world] built in ${Math.round(performance.now() - t0)} ms, colliders ${colliders.list.length}, trees ${ctx.treeCount}, crop shrubs ${ctx.shrubCount}`);
   // Paved (non-slowing) areas besides roads.
   ctx.pavedRects = [...world.L.commercial, ...world.L.amenities.filter((a) => ['parking', 'agro', 'fire-station', 'wtp', 'school'].includes(a.id)), ...world.L.parks.map((p) => ({ x: p.x, y: p.y + p.h / 2 - 2, w: p.w, h: 4 }))];
 
   const input = new Input(); input.invertSteer = settings.get('invertSteer');
   const car = new CarModel(world, colliders, ctx);
-  const carVisual = new CarVisual(scene, ctx.T);
+  const carVisual = new CarVisual(scene, ctx.T, carModel);
   const rig = new CameraRig(camera, settings);
   const missions = new Missions(scene, world, settings, audio, ui);
   const minimap = new Minimap(world, $('minimap'), $('bigmap-canvas'));
@@ -272,15 +285,16 @@ async function boot() {
       if (!G.autoQ.done) { G.autoQ.t += dt; if (G.autoQ.t > 2) { G.autoQ.sum += 1 / Math.max(dt, 1e-3); G.autoQ.samples++; } if (G.autoQ.t > 5) { G.autoQ.done = true; const avg = G.autoQ.sum / G.autoQ.samples; console.log('[auto-quality] avg fps', avg.toFixed(1)); if (avg < 45) { settings.set('quality', 'low'); renderer.shadowMap.enabled = false; ctx.lighting.sun.castShadow = false; renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25)); ui.toast('Performance: switched to Low quality (saved for next time).', 4); } } }
       if (!$('debug').classList.contains('hidden')) {
         const info = renderer.info;
-        ui.debug([`fps ${loop.fps.toFixed(0)}  frame ${(dt * 1000).toFixed(1)} ms  steps ${loop.stepsThisFrame}`, `draw calls ${info.render.calls}  tris ${(info.render.triangles / 1e6).toFixed(2)} M`, `pos ${car.x.toFixed(1)}, ${car.z.toFixed(1)}  yaw ${(car.yaw * 57.3).toFixed(0)}°`, `speed ${(car.speed * KMH).toFixed(1)} km/h  slip ${(car.telemetry.slip * 30).toFixed(1)}°  latG ${car.telemetry.latG.toFixed(1)}`, `steer ${(car.steer * 57.3).toFixed(1)}° / max ${(car.steerMax * 57.3).toFixed(0)}°  boost ${(car.boostCharge * 100).toFixed(0)}%`, `offroad ${car.offroad}  hedge ${!!car.hedge}  stuck ${car.stuck.toFixed(2)}`, `zone ${world.zoneOf(car.x, car.z)}  nearest ${lastNearestPick ? lastNearestPick.plot.id : '-'}`, `colliders ${colliders.list.length}  trees ${ctx.treeCount}  shrubs ${ctx.shrubCount}`, `counts farms ${world.L.farms.length} villas ${world.L.villas.length} th ${world.L.townhouses.length} com ${world.L.commercial.length} parks ${world.L.parks.length}`]);
+        ui.debug([`fps ${loop.fps.toFixed(0)}  frame ${(dt * 1000).toFixed(1)} ms  steps ${loop.stepsThisFrame}`, `draw calls ${info.render.calls}  tris ${(info.render.triangles / 1e6).toFixed(2)} M`, `pos ${car.x.toFixed(1)}, ${car.z.toFixed(1)}  yaw ${(car.yaw * 57.3).toFixed(0)}°`, `speed ${(car.speed * KMH).toFixed(1)} km/h  slip ${(car.telemetry.slip * 30).toFixed(1)}°  latG ${car.telemetry.latG.toFixed(1)}`, `steer ${(car.steer * 57.3).toFixed(1)}° / max ${(car.steerMax * 57.3).toFixed(0)}°  boost ${(car.boostCharge * 100).toFixed(0)}%`, `offroad ${car.offroad}  hedge ${!!car.hedge}  stuck ${car.stuck.toFixed(2)}`, `zone ${world.zoneOf(car.x, car.z)}  nearest ${lastNearestPick ? lastNearestPick.plot.id : '-'}`, `colliders ${colliders.list.length}  trees ${ctx.treeCount}  shrubs ${ctx.shrubCount}  parked ${ctx.parkedCars || 0}`, `counts farms ${world.L.farms.length} villas ${world.L.villas.length} th ${world.L.townhouses.length} com ${world.L.commercial.length} parks ${world.L.parks.length}`]);
       }
     }
     for (const fn of ctx.animate) fn(dt, simTime);
+    updateLOD(ctx, camera.position);
     renderer.render(scene, camera);
   }
   const loop = new Loop(sim, render);
   ui.hideLoading(); ui.showTitle(settings.get('bestLap'));
   loop.start();
-  window.__svd = { car, world, ctx, rig, missions, settings, teleportTo, startDrive };
+  window.__svd = { car, world, ctx, rig, missions, settings, teleportTo, startDrive, finishSwoop, G, carVisual, loop };
 }
 boot().catch((e) => { console.error('[boot] ' + (e && e.stack ? e.stack : String(e))); ui.fatal((e && (e.message || e.stack)) || String(e)); });

@@ -124,7 +124,7 @@ export function roadPlacement(world, x, y, prefer) {
     yaw = prefer !== undefined ? (Math.cos(prefer - Math.PI / 2) >= 0 ? Math.PI / 2 : -Math.PI / 2) : Math.PI / 2;
   } else {
     px = r.x + r.w / 2; py = Math.min(Math.max(y, r.y + 10), r.y + r.h - 10);
-    if (r.kind === 'spine') px = x < r.x + r.w / 2 ? r.x + 6 : r.x + r.w - 6; // carriageway either side of the median
+    if (r.kind === 'spine') px = x < r.x + r.w / 2 ? r.x + 7.5 : r.x + r.w - 7.5; // carriageway centre either side of the median (3 m verge + 8 m lane)
     yaw = prefer !== undefined ? (Math.cos(prefer) >= 0 ? 0 : Math.PI) : 0;
   }
   return { x: px, y: py, yaw, road: r };

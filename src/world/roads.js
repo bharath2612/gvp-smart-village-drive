@@ -4,13 +4,15 @@ import { instancedChunks } from './instancing.js';
 import { rng } from '../util/math.js';
 
 // Returns the [a,b] intervals along a road's long axis where other roads cross it (junctions).
-function junctionIntervals(road, roads) {
+export function junctionIntervals(road, roads) {
   const out = [];
   for (const o of roads) {
     if (o === road) continue;
     const ix0 = Math.max(road.x, o.x), ix1 = Math.min(road.x + road.w, o.x + o.w);
     const iz0 = Math.max(road.y, o.y), iz1 = Math.min(road.y + road.h, o.y + o.h);
-    if (ix1 - ix0 <= 0.5 || iz1 - iz0 <= 0.5) continue;
+    // Roads that merely touch (a 20 m road ending on the boundary road) still form a junction mouth.
+    if (ix1 - ix0 < -0.5 || iz1 - iz0 < -0.5) continue;
+    if (ix1 - ix0 <= 0.5 && iz1 - iz0 <= 0.5) continue; // corner touch only
     out.push(road.horizontal ? [ix0 - 1, ix1 + 1] : [iz0 - 1, iz1 + 1]);
   }
   return out;
@@ -25,7 +27,8 @@ function subtract(len, intervals) {
 export function buildRoads(ctx) {
   const { scene, world, T, colliders } = ctx;
   const roads = world.roads;
-  const asphalt = [], concrete = [], marks = [], kerbs = [], medians = [], bumps = [], zebras = [];
+  const asphalt = [], concrete = [], marks = [], kerbs = [], medians = [], verges = [], zebras = [], stops = [], ramps = [];
+  const bumpItems = [], signItems = [];
   const lampItems = [];
   ctx.bumps = [];
 
@@ -37,12 +40,18 @@ export function buildRoads(ctx) {
     const jx = junctionIntervals(r, roads);
     const segs = subtract(len, jx);
     const along = (t, off, y, gw, gl) => (r.horizontal ? patchGeo(r.x + t, r.y + off - gw / 2, gl, gw, 1, y) : patchGeo(r.x + off - gw / 2, r.y + t, gw, gl, 1, y));
+    // 25 m roads and the spine get a 3 m planted verge along both edges (trees stand on grass, not asphalt).
+    const verge = (r.kind === '25m' || isSpine) ? 3 : 0;
     // Edge lines and kerbs along non-junction segments.
     for (const [a, b] of segs) {
-      for (const side of [0.5, wid - 0.5]) marks.push(along(a, side, 0.09, 0.15, b - a));
+      for (const side of [verge + 0.5, wid - verge - 0.5]) marks.push(along(a, side, 0.09, 0.15, b - a));
       for (const side of [-0.15, wid + 0.15]) {
         const kg = r.horizontal ? box(b - a, 0.15, 0.3, 0xb9b7b0, { x: r.x + a + (b - a) / 2, z: r.y + side }) : box(0.3, 0.15, b - a, 0xb9b7b0, { x: r.x + side, z: r.y + a + (b - a) / 2 });
         kerbs.push(kg);
+      }
+      if (verge) {
+        verges.push(along(a, verge / 2, 0.075, verge, b - a)); verges.push(along(a, wid - verge / 2, 0.075, verge, b - a));
+        for (const side of [verge, wid - verge]) kerbs.push(r.horizontal ? box(b - a, 0.12, 0.25, 0xb9b7b0, { x: r.x + a + (b - a) / 2, z: r.y + side }) : box(0.25, 0.12, b - a, 0xb9b7b0, { x: r.x + side, z: r.y + a + (b - a) / 2 }));
       }
       // Centre dashes on 15 m and wider (not the spine: it has a median).
       if (!isSpine && (r.kind === '15m' || r.kind === '20m' || r.kind === '25m')) {
@@ -50,7 +59,7 @@ export function buildRoads(ctx) {
       }
       // Lamp posts every 40 m on 20 m and wider, both sides, 1.2 m inside the kerb.
       if (r.kind === '20m' || r.kind === '25m' || isSpine) {
-        for (let t = a + 12; t < b - 6; t += 40) for (const side of [1.2, wid - 1.2]) {
+        for (let t = a + 12; t < b - 6; t += 40) for (const side of [verge ? 1.5 : 1.2, wid - (verge ? 1.5 : 1.2)]) {
           const x = r.horizontal ? r.x + t : r.x + side, z = r.horizontal ? r.y + side : r.y + t;
           const rot = r.horizontal ? (side < wid / 2 ? Math.PI : 0) : (side < wid / 2 ? -Math.PI / 2 : Math.PI / 2);
           lampItems.push({ x, z, rot });
@@ -74,7 +83,8 @@ export function buildRoads(ctx) {
       }
     }
   }
-  // Zebra crossings and speed bumps within 60 m of school, temple and parks.
+  // Zebra crossings within 60 m of school, temple and parks: 0.5 m stripes, stop lines, tactile ramps,
+  // a crossing sign on each side, and a rounded striped speed bump 14 m before the crossing each way.
   const hot = [...world.parks, ...world.amenities.filter((a) => a.id === 'school' || a.id === 'temple')];
   for (const h of hot) {
     for (const r of roads) {
@@ -83,12 +93,15 @@ export function buildRoads(ctx) {
       if (dx > 60 || dz > 60) continue;
       const wid = r.horizontal ? r.h : r.w;
       const t = r.horizontal ? Math.min(Math.max(h.x + h.w / 2, r.x + 30), r.x + r.w - 30) - r.x : Math.min(Math.max(h.y + h.h / 2, r.y + 30), r.y + r.h - 30) - r.y;
-      for (let s = 0.8; s < wid - 0.8; s += 1.2) zebras.push(r.horizontal ? patchGeo(r.x + t - 2, r.y + s, 4, 0.6, 1, 0.09) : patchGeo(r.x + s, r.y + t - 2, 0.6, 4, 1, 0.09));
+      const at = (tt, off, y, gw, gl) => (r.horizontal ? patchGeo(r.x + tt - gl / 2, r.y + off - gw / 2, gl, gw, 1, y) : patchGeo(r.x + off - gw / 2, r.y + tt - gl / 2, gw, gl, 1, y));
+      for (let s = 0.9; s < wid - 0.8; s += 1.0) zebras.push(at(t, s, 0.1, 0.5, 4));
+      for (const side of [-1, 1]) stops.push(at(t + side * 4.4, wid / 2, 0.1, wid - 1.2, 0.4));
+      for (const off of [-0.9, wid + 0.9]) ramps.push(r.horizontal ? box(2.4, 0.06, 1.4, 0x9c9a94, { x: r.x + t, z: r.y + off, y: 0.03 }) : box(1.4, 0.06, 2.4, 0x9c9a94, { x: r.x + off, z: r.y + t, y: 0.03 }));
+      for (const off of [-1.6, wid + 1.6]) { const x = r.horizontal ? r.x + t + (off < 0 ? -3.2 : 3.2) : r.x + off, z = r.horizontal ? r.y + off : r.y + t + (off < 0 ? -3.2 : 3.2); signItems.push({ x, z, rot: r.horizontal ? 0 : Math.PI / 2 }); }
       for (const off of [-14, 14]) {
-        const bx = r.horizontal ? r.x + t + off : r.x + 0.5, bz = r.horizontal ? r.y + 0.5 : r.y + t + off;
-        const bw = r.horizontal ? 3 : wid - 1, bh = r.horizontal ? wid - 1 : 3;
-        bumps.push(patchGeo(bx, bz, bw, bh, 1, 0.12));
-        ctx.bumps.push({ x: bx, z: bz, w: bw, h: bh });
+        const bx = r.horizontal ? r.x + t + off : r.x + wid / 2, bz = r.horizontal ? r.y + wid / 2 : r.y + t + off;
+        bumpItems.push({ x: bx, z: bz, rot: r.horizontal ? 0 : Math.PI / 2, sx: 1, sy: 1, sz: wid - 1.2 });
+        ctx.bumps.push(r.horizontal ? { x: bx - 0.5, z: r.y + 0.6, w: 1, h: wid - 1.2 } : { x: r.x + 0.6, z: bz - 0.5, w: wid - 1.2, h: 1 });
       }
     }
   }
@@ -97,10 +110,24 @@ export function buildRoads(ctx) {
   add(asphalt, stdMat(T, T.asphalt), 'roads-asphalt');
   add(concrete, stdMat(T, T.concrete, { color: 0xc9c7bf }), 'roads-concrete');
   add(marks, new THREE.MeshStandardMaterial({ color: 0xf2f2ea, roughness: 0.6, emissive: 0x222222 }), 'road-marks');
-  add(zebras, new THREE.MeshStandardMaterial({ color: 0xf5f5ef, roughness: 0.6, emissive: 0x222222 }), 'zebras');
-  add(bumps, new THREE.MeshStandardMaterial({ color: 0xd9b23a, roughness: 0.8 }), 'speed-bumps');
+  add(zebras, new THREE.MeshStandardMaterial({ color: 0xf7f7f2, roughness: 0.55, emissive: 0x2a2a2a }), 'zebras');
+  add(stops, new THREE.MeshStandardMaterial({ color: 0xf7f7f2, roughness: 0.55, emissive: 0x2a2a2a }), 'stop-lines');
+  add(ramps, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }), 'kerb-ramps');
   add(kerbs, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), 'kerbs');
   add(medians, stdMat(T, T.lawn), 'medians');
+  add(verges, stdMat(T, T.lawn), 'verges');
+  // Rounded speed bumps with yellow/black stripes: half cylinder along z, flat side down, striped canvas texture.
+  { const c = document.createElement('canvas'); c.width = 8; c.height = 64; const g = c.getContext('2d'); for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#1a1a1a' : '#e5b92e'; g.fillRect(0, i * 8, 8, 8); }
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(1, 4); tex.magFilter = THREE.NearestFilter;
+    const bg = new THREE.CylinderGeometry(0.11, 0.11, 1, 10, 1, false, -Math.PI / 2, Math.PI); // half cylinder, cap open side down
+    bg.rotateX(Math.PI / 2); bg.computeBoundingBox(); if (bg.boundingBox.max.y < 0.05) bg.rotateZ(Math.PI); bg.computeBoundingBox(); bg.translate(0, -bg.boundingBox.min.y + 0.06, 0);
+    scene.add(instancedChunks(bg, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }), bumpItems, { name: 'speed-bumps', chunk: 600 })); }
+  // Pedestrian-crossing signs: pole + yellow diamond with a black border and a walking-figure glyph.
+  { const dia = (sz, col, y, zz) => { const d = box(sz, sz, 0.05, col, { y, z: zz }); return d; };
+    const d1 = dia(0.78, 0x111111, 2.55, 0), d2 = dia(0.64, 0xf2c12e, 2.55, 0.01); d1.translate(0, -2.55, 0); d1.rotateZ(Math.PI / 4); d1.translate(0, 2.55, 0); d2.translate(0, -2.55, 0); d2.rotateZ(Math.PI / 4); d2.translate(0, 2.55, 0);
+    const sg = merge([cyl(0.05, 0.06, 2.6, 8, 0x6a6f76, { y: 1.3 }), d1, d2, box(0.1, 0.32, 0.07, 0x111111, { y: 2.6, z: 0.02 }), box(0.28, 0.05, 0.07, 0x111111, { y: 2.42, z: 0.02 }), box(0.14, 0.14, 0.07, 0x111111, { y: 2.82, z: 0.02 })]);
+    scene.add(instancedChunks(sg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }), signItems, { name: 'crossing-signs', chunk: 600, castShadow: true }));
+    for (const it of signItems) colliders.add(it.x - 0.15, it.z - 0.15, it.x + 0.15, it.z + 0.15, 'sign'); }
 
   // Lamp posts: pole + arm (one instanced geometry) and an emissive head (second instanced mesh, toggled at night).
   const pole = merge([cyl(0.09, 0.14, 8, 8, 0x5a5f66), box(1.6, 0.12, 0.12, 0x5a5f66, { x: 0.8, y: 7.9 })]);

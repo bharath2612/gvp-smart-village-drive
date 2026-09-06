@@ -1,53 +1,62 @@
-// Trees (3 species), farm hedges, crop shrubs with drive-over flattening.
+// Trees from the Kenney nature kit (baked, instanced, LOD to procedural beyond ctx.lodDistance),
+// farm hedges, and crop shrubs with drive-over flattening.
 import * as THREE from 'three';
 import { box, cyl, ico, merge } from './geo.js';
 import { instancedChunks } from './instancing.js';
 import { rng } from '../util/math.js';
+import { junctionIntervals } from './roads.js';
 
-function broadleaf() {
-  return merge([cyl(0.22, 0.34, 4.2, 7, 0x5b3f26, { y: 2.1 }), ico(3.2, 1, 0x3f7a2f, { y: 6.2, sy: 0.85, jitter: 0.25 }), ico(2.3, 1, 0x4c8c36, { y: 8.2, x: 0.8, sy: 0.9, jitter: 0.25 }), ico(2.0, 1, 0x38702c, { y: 7.4, x: -1.4, z: 0.8, jitter: 0.25 })]);
-}
-function palm() {
-  const L = [cyl(0.22, 0.32, 9.5, 7, 0x8a6d4a, { y: 4.75 })];
-  for (let i = 0; i < 7; i++) { const a = (i / 7) * Math.PI * 2; const f = box(4.2, 0.12, 0.9, 0x6aa53a); f.translate(2.0, 0, 0); f.rotateZ(-0.35); f.rotateY(a); f.translate(0, 9.6, 0); L.push(f); }
-  L.push(ico(0.7, 0, 0x5d8a2e, { y: 9.6 }));
-  return merge(L);
-}
-function flowering() {
-  return merge([cyl(0.18, 0.28, 3.2, 7, 0x6b4a2e, { y: 1.6 }), ico(2.6, 1, 0xc97ba8, { y: 4.9, sy: 0.8, jitter: 0.3 }), ico(1.8, 1, 0xd88fb7, { y: 6.1, x: 0.7, z: -0.5, jitter: 0.3 }), ico(1.5, 1, 0x4d8a3a, { y: 4.0, x: -1.2, z: 0.6, jitter: 0.2 })]);
-}
+// Procedural low-detail stand-ins used beyond the LOD distance (and as fallback if a model failed).
+function loBroadleaf() { return merge([cyl(0.22, 0.34, 4.2, 5, 0x5b3f26, { y: 2.1 }), ico(3.0, 0, 0x3f7a2f, { y: 6.4, sy: 0.9, jitter: 0.2 })]); }
+function loPalm() { const L = [cyl(0.22, 0.32, 9.5, 5, 0x8a6d4a, { y: 4.75 })]; for (let i = 0; i < 5; i++) { const f = box(4.2, 0.12, 0.9, 0x5aa544); f.translate(2.0, 0, 0); f.rotateZ(-0.35); f.rotateY((i / 5) * Math.PI * 2); f.translate(0, 9.6, 0); L.push(f); } return merge(L); }
+
+const SPECIES = [
+  { key: 'tree_default', height: 9, lo: 'broad', tint: [0.9, 1.1] },
+  { key: 'tree_oak', height: 11, lo: 'broad', tint: [0.85, 1.05] },
+  { key: 'tree_detailed', height: 12, lo: 'broad', tint: [0.9, 1.1] },
+  { key: 'tree_fat', height: 9, lo: 'broad', tint: [0.95, 1.15] },
+  { key: 'tree_tall', height: 13, lo: 'broad', tint: [0.85, 1.0] },
+  { key: 'tree_palmDetailedTall', height: 12, lo: 'palm', tint: [0.95, 1.1] },
+  { key: 'tree_palmBend', height: 9, lo: 'palm', tint: [0.95, 1.1] },
+];
+const BROAD = [0, 1, 2, 3, 4], PALMS = [5, 6];
 
 export function buildVegetation(ctx) {
-  const { scene, world, colliders } = ctx;
+  const { scene, world, colliders, models } = ctx;
   const L = world.L;
   const density = ctx.qualityPreset.treeDensity;
   const r = rng(4242);
-  const trees = [[], [], []];
+  const items = SPECIES.map(() => []);
   const addTree = (x, z, species, solid = true, scale) => {
     if (r() > density) return;
-    const s = scale || 0.85 + r() * 0.4;
-    trees[species].push({ x, z, rot: r() * Math.PI * 2, sx: s, sy: s, sz: s });
+    const sp = SPECIES[species];
+    const s = scale || 0.85 + r() * 0.35;
+    const t = sp.tint[0] + r() * (sp.tint[1] - sp.tint[0]);
+    items[species].push({ x, z, rot: r() * Math.PI * 2, sx: s, sy: s * (0.95 + r() * 0.1), sz: s, color: new THREE.Color(t, t, t) });
     if (solid) colliders.add(x - 0.5, z - 0.5, x + 0.5, z + 0.5, 'tree');
   };
-  // Street trees inside the 25 m and spine road rectangles (1.4 m in from the kerb), every 12 m, skipping junctions.
+  const pick = (set) => set[Math.floor(r() * set.length)];
+
+  // Street trees in the 3 m grass verge of 25 m roads and the spine, every 15 m, skipping junctions.
   for (const rd of world.roads) {
     if (!(rd.kind === '25m' || rd.kind === 'spine')) continue;
     const len = rd.horizontal ? rd.w : rd.h, wid = rd.horizontal ? rd.h : rd.w;
-    for (let t = 8; t < len - 8; t += 12) {
-      for (const side of [1.6, wid - 1.6]) {
+    const jx = junctionIntervals(rd, world.roads);
+    for (let t = 10; t < len - 8; t += 15) {
+      if (jx.some(([a, b]) => t > a - 6 && t < b + 6)) continue;
+      for (const side of [1.5, wid - 1.5]) {
         const x = rd.horizontal ? rd.x + t : rd.x + side, z = rd.horizontal ? rd.y + side : rd.y + t;
-        if (world.roads.some((o) => o !== rd && x > o.x - 4 && x < o.x + o.w + 4 && z > o.y - 4 && z < o.y + o.h + 4)) continue;
-        addTree(x, z, rd.kind === 'spine' ? 1 : 0);
+        addTree(x, z, rd.kind === 'spine' ? pick(PALMS) : pick(BROAD), true, 0.7 + r() * 0.2);
       }
     }
   }
-  // Spine median trees.
-  for (const seg of ctx.medianSegments || []) for (let z = seg.z0 + 8; z < seg.z1 - 6; z += 14) addTree(seg.x, z, z % 28 < 14 ? 2 : 0, false, 0.8);
+  // Spine median palms.
+  for (const seg of ctx.medianSegments || []) for (let z = seg.z0 + 8; z < seg.z1 - 6; z += 14) addTree(seg.x, z, pick(PALMS), false, 0.75 + r() * 0.15);
   // Parks: dense, avoiding paths.
-  for (const pk of L.parks) for (let i = 0; i < 140; i++) { const x = pk.x + 4 + r() * (pk.w - 8), z = pk.y + 4 + r() * (pk.h - 8); if (Math.abs(z - (pk.y + pk.h / 2)) < 4) continue; addTree(x, z, i % 3); }
+  for (const pk of L.parks) for (let i = 0; i < 150; i++) { const x = pk.x + 4 + r() * (pk.w - 8), z = pk.y + 4 + r() * (pk.h - 8); if (Math.abs(z - (pk.y + pk.h / 2)) < 4) continue; let onPath = false; for (let k = 0; k < 4; k++) if (Math.abs(x - (pk.x + pk.w * (0.2 + k * 0.2))) < 3) onPath = true; if (onPath) continue; addTree(x, z, pick(BROAD)); }
   // Lake ring outside the track, temple lawns.
-  { const lk = L.lake.bbox; const o = 22; for (let x = lk.x - o; x <= lk.x + lk.w + o; x += 15) { addTree(x, lk.y - o, 1); addTree(x, lk.y + lk.h + o, 1); } for (let z = lk.y - o + 15; z < lk.y + lk.h + o; z += 15) { addTree(lk.x - o, z, 1); addTree(lk.x + lk.w + o, z, 1); } }
-  { const t = L.amenities.find((a) => a.id === 'temple'); for (let i = 0; i < 24; i++) { const x = t.x + 8 + r() * (t.w - 16), z = t.y + 8 + r() * (t.h - 16); if (Math.abs(x - t.x - t.w / 2) < 36 && Math.abs(z - t.y - t.h / 2) < 36) continue; addTree(x, z, 2); } }
+  { const lk = L.lake.bbox; const o = 24; for (let x = lk.x - o; x <= lk.x + lk.w + o; x += 16) { addTree(x, lk.y - o, pick(PALMS)); addTree(x, lk.y + lk.h + o, pick(PALMS)); } for (let z = lk.y - o + 16; z < lk.y + lk.h + o; z += 16) { addTree(lk.x - o, z, pick(PALMS)); addTree(lk.x + lk.w + o, z, pick(PALMS)); } }
+  { const t = L.amenities.find((a) => a.id === 'temple'); for (let i = 0; i < 28; i++) { const x = t.x + 8 + r() * (t.w - 16), z = t.y + 8 + r() * (t.h - 16); if (Math.abs(x - t.x - t.w / 2) < 48 && Math.abs(z - t.y - t.h / 2) < 48) continue; if (Math.abs(x - t.x - t.w / 2) < 6 || Math.abs(z - t.y - t.h / 2) < 6) continue; addTree(x, z, i % 3 ? pick(BROAD) : pick(PALMS)); } }
   // Farm plots: 6 to 10 along the hedges, away from the pad.
   for (const f of L.farms) {
     const n = 6 + Math.floor(r() * 5);
@@ -55,18 +64,30 @@ export function buildVegetation(ctx) {
       const edge = Math.floor(r() * 4); let x, z;
       if (edge === 0) { x = f.x + 4 + r() * (f.w - 8); z = f.y + 3.5; } else if (edge === 1) { x = f.x + 4 + r() * (f.w - 8); z = f.y + f.h - 3.5; } else if (edge === 2) { x = f.x + 3.5; z = f.y + 4 + r() * (f.h - 8); } else { x = f.x + f.w - 3.5; z = f.y + 4 + r() * (f.h - 8); }
       if (f.pad && x > f.pad.x - 2 && x < f.pad.x + f.pad.w + 2 && z > f.pad.y - 2 && z < f.pad.y + f.pad.h + 2) continue;
-      addTree(x, z, i % 2 ? 0 : 2, true, 0.7 + r() * 0.3);
+      addTree(x, z, pick(BROAD), true, 0.7 + r() * 0.3);
     }
   }
-  // Villa and town house gardens: one tree each behind the house.
-  for (const p of world.plots) { if (p.type === 'villa') { const x = p.x + 3 + r() * (p.w - 6), z = p.facing === 'S' ? p.y + 2.5 : p.y + p.h - 2.5; addTree(x, z, 2, false, 0.6 + r() * 0.3); } }
-  const treeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
-  const geos = [broadleaf(), palm(), flowering()];
-  geos.forEach((g, i) => scene.add(instancedChunks(g, treeMat, trees[i], { name: `trees-${i}`, castShadow: true })));
-  ctx.treeCount = trees.reduce((a, l) => a + l.length, 0);
+  // Villa gardens: one tree behind each house.
+  for (const p of world.plots) { if (p.type === 'villa') { const x = p.x + 3 + r() * (p.w - 6), z = p.facing === 'S' ? p.y + 2.5 : p.y + p.h - 2.5; addTree(x, z, pick(BROAD), false, 0.55 + r() * 0.25); } }
+
+  const treeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  const loGeos = { broad: loBroadleaf(), palm: loPalm() };
+  ctx.lod = ctx.lod || [];
+  SPECIES.forEach((sp, i) => {
+    if (!items[i].length) return;
+    const m = models && models[sp.key];
+    const lo = instancedChunks(loGeos[sp.lo], treeMat, items[i].map((it) => ({ ...it, sy: it.sy * (sp.height / (sp.lo === 'palm' ? 10 : 8.5)) })), { name: `trees-lo-${sp.key}`, chunk: 300 });
+    scene.add(lo);
+    if (m) {
+      const hi = instancedChunks(m.geo, treeMat, items[i], { name: `trees-${sp.key}`, chunk: 300, castShadow: true });
+      scene.add(hi);
+      ctx.lod.push({ hi, lo });
+    }
+  });
+  ctx.treeCount = items.reduce((a, l) => a + l.length, 0);
 
   // Hedges: four edges per farm, 1.2 m high, gap on the pad side facing the road.
-  const hedgeGeo = box(1, 1.2, 0.8, 0x2f6b2a); hedgeGeo.translate(0, 0, 0);
+  const hedgeGeo = box(1, 1.2, 0.8, 0x2f6b2a);
   const hedges = [];
   ctx.hedgeGaps = new Map();
   for (const f of L.farms) {
@@ -82,15 +103,15 @@ export function buildVegetation(ctx) {
   scene.add(instancedChunks(hedgeGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), hedges, { name: 'hedges', chunk: 300 }));
 
   // Crop shrubs: rows 3 m apart, flattened when driven over, recovering over 10 s.
-  const shrubGeo = ico(0.55, 0, 0x4f9a3b, { y: 0.45, sy: 0.9, jitter: 0.3 });
+  const shrubGeo = (models && models.plant_bushDetailed) ? models.plant_bushDetailed.geo : ico(0.55, 0, 0x4f9a3b, { y: 0.45, sy: 0.9, jitter: 0.3 });
   const shrubs = [];
   const cropCell = new Map(); const CELL = 12;
   for (const f of L.farms) {
     const c = f.crop; if (!c) continue;
     for (let z = c.y + 1.5; z < c.y + c.h - 1; z += 3) for (let x = c.x + 1.5; x < c.x + c.w - 1; x += 2.6) {
       if (r() > density + 0.15) continue;
-      const s = 0.8 + r() * 0.4;
-      shrubs.push({ x: x + (r() - 0.5) * 0.6, z: z + (r() - 0.5) * 0.6, rot: r() * 6.28, sx: s, sy: s, sz: s });
+      const s = 0.8 + r() * 0.4; const t = 0.9 + r() * 0.2;
+      shrubs.push({ x: x + (r() - 0.5) * 0.6, z: z + (r() - 0.5) * 0.6, rot: r() * 6.28, sx: s, sy: s, sz: s, color: new THREE.Color(t, t, t) });
     }
   }
   const shrubRoot = instancedChunks(shrubGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), shrubs, {
@@ -112,4 +133,19 @@ export function buildVegetation(ctx) {
       for (let i = flattened.length - 1; i >= 0; i--) { const s = flattened[i]; const age = now - s.t; if (age > 10) { setScaleY(s, 1); s.t = -1; flattened.splice(i, 1); } else if (age > 2) setScaleY(s, 0.18 + 0.82 * ((age - 2) / 8)); }
     },
   };
+}
+
+// Per-frame LOD: chunks nearer than lodDistance show the model, farther ones the stand-in.
+export function updateLOD(ctx, camPos) {
+  const d = ctx.lodDistance; const d2 = d * d;
+  for (const { hi, lo } of ctx.lod || []) {
+    const hc = hi.children, lc = lo.children;
+    for (let i = 0; i < hc.length; i++) {
+      const bs = hc[i].geometry.boundingSphere; // chunks are at identity, but the shared geometry sphere is per model; use instance bounds instead
+      const c = hc[i].boundingSphere || hc[i].computeBoundingSphere() || hc[i].boundingSphere;
+      const dx = c.center.x - camPos.x, dz = c.center.z - camPos.z; const dist2 = dx * dx + dz * dz;
+      const near = dist2 < (d + c.radius) * (d + c.radius);
+      hc[i].visible = near; lc[i].visible = !near;
+    }
+  }
 }

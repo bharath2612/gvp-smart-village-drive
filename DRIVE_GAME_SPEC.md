@@ -231,6 +231,9 @@ A free-roam driving game. The whole core village (3000 x 3000 m, real scale) is 
 
 ---
 
+## 11a. Implemented asset approach (6 September 2026)
+The shipped build stays well under the 40 MB budget agreed after v1: textures and audio are procedural, and geometry comes from two CC0 Kenney kits (Nature Kit trees, bushes, flowers, rocks, pots; Car Kit SUV and parked cars), about 1.7 MB in total. Trees use the model within 380 m and a procedural stand-in beyond (`updateLOD`). The temple (stepped plinth, pillared mandapa, seven-tier gopuram), stadium (twelve seat rows, roof canopy, floodlight arrays, eight-lane track, marked pitch) and crossings (0.5 m stripes, stop lines, tactile ramps, signs, striped rounded bumps) are procedural. A user-supplied SUV GLB at `public/models/suv.glb` overrides the Kenney one.
+
 ## 12. Architecture
 
 ```

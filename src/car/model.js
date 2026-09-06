@@ -118,6 +118,7 @@ export class CarModel {
       const near = this.colliders.near(this.x, this.z);
       for (const p of pts) {
         for (const c of near) {
+          if (c.dead) continue;
           if (p.x <= c.x0 || p.x >= c.x1 || p.z <= c.z0 || p.z >= c.z1) continue;
           const dx0 = p.x - c.x0, dx1 = c.x1 - p.x, dz0 = p.z - c.z0, dz1 = c.z1 - p.z;
           const m = Math.min(dx0, dx1, dz0, dz1);

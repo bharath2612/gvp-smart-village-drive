@@ -103,3 +103,7 @@ h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; font-weight: 600; 
 .splash-fade.show { opacity: 1; }
 @media (max-width: 900px) { #plot-card { width: 300px; } #minimap { width: 160px; height: 160px; } #compass { min-width: 200px; } }
 #fatal[hidden] { display: none; }
+
+#swap-prompt { position: absolute; bottom: 60px; left: 50%; transform: translate(-50%, 20px); display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 18px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; }
+#swap-prompt.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+#swap-prompt .btn { margin: 0; }

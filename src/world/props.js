@@ -4,7 +4,9 @@ import { instancedChunks } from './instancing.js';
 import { recolorPalette } from './models.js';
 import { rng, hashStr } from '../util/math.js';
 
-const CAR_COLOURS = [0xd8dde2, 0x1e4fa3, 0xb8302a, 0x2f2f33, 0xe8e2d0, 0x6b7f8f];
+export const CAR_COLOURS = [0xd8dde2, 0x1e4fa3, 0xb8302a, 0x2f2f33, 0xe8e2d0, 0x6b7f8f];
+export const CAR_NAMES = { suv: 'SUV', 'suv-luxury': 'Luxury SUV', sedan: 'Sedan', 'sedan-sports': 'Sports sedan', 'hatchback-sports': 'Sports hatchback', van: 'Van', taxi: 'Taxi', delivery: 'Delivery van' };
+export const CAR_LENGTHS = { suv: 4.7, 'suv-luxury': 4.7, sedan: 4.4, 'sedan-sports': 4.5, 'hatchback-sports': 4.2, van: 4.9, taxi: 4.5, delivery: 5.2 };
 
 export function buildProps(ctx) {
   const { scene, world, colliders, models } = ctx;
@@ -21,9 +23,17 @@ export function buildProps(ctx) {
     const to = CAR_COLOURS[(hashStr(k) + v * 2) % CAR_COLOURS.length];
     const map = src.paletteMap && src.paintColors && src.paintColors.length ? recolorPalette(src.paletteMap, src.paintColors, to, src.dominant) : src.paletteMap;
     const m = map ? new THREE.MeshStandardMaterial({ map, roughness: 0.55, metalness: 0.15 }) : mat;
-    variants.push({ geo: src.geo, mat: m, items: [], size: src.size });
+    variants.push({ key: k, color: to, geo: src.geo, mat: m, items: [], size: src.size });
   }
-  const park = (x, z, rot) => { const v = variants[Math.floor(r() * variants.length)]; v.items.push({ x, z, rot }); const hw = 1.1, hl = 2.5; const c = Math.abs(Math.cos(rot)) > 0.5 ? [hw, hl] : [hl, hw]; colliders.add(x - c[0], z - c[1], x + c[0], z + c[1], 'car'); };
+  // Every parked car is registered so the player can swap into it (see game/swap.js).
+  const registry = []; ctx.parkedRegistry = registry;
+  const park = (x, z, rot) => {
+    const v = variants[Math.floor(r() * variants.length)];
+    const hw = 1.1, hl = 2.5; const c = Math.abs(Math.cos(rot)) > 0.5 ? [hw, hl] : [hl, hw];
+    const collider = colliders.add(x - c[0], z - c[1], x + c[0], z + c[1], 'car');
+    const entry = { key: v.key, color: v.color, x, z, rot, collider, mesh: null, index: -1 };
+    v.items.push({ x, z, rot, entry }); registry.push(entry);
+  };
   for (const p of world.plots) {
     const h = hashStr(p.id + 'car') % 100;
     if (p.type === 'villa' && h < 22) { const x = p.house.x + p.house.w + 2.2 > p.x + p.w - 1.2 ? p.x + p.w - 2.2 : p.house.x + p.house.w + 2.2; const z = p.facing === 'S' ? p.house.y + p.house.h + 4.5 : p.house.y - 4.5; park(x, z, p.facing === 'S' ? 0 : Math.PI); }
@@ -34,7 +44,7 @@ export function buildProps(ctx) {
   const lot = world.amenities.find((a) => a.id === 'parking');
   if (lot) for (let z = lot.y + 13; z < lot.y + lot.h - 13; z += 6) { if (r() < 0.45) park(lot.x + 28, z, -Math.PI / 2); if (r() < 0.45) park(lot.x + lot.w - 28, z, Math.PI / 2); }
   let carCount = 0;
-  for (const v of variants) { if (!v.items.length) continue; carCount += v.items.length; scene.add(instancedChunks(v.geo, v.mat, v.items, { name: 'parked-cars', chunk: 400, castShadow: true })); }
+  for (const v of variants) { if (!v.items.length) continue; carCount += v.items.length; scene.add(instancedChunks(v.geo, v.mat, v.items, { name: 'parked-cars', chunk: 400, castShadow: true, onInstance: (mesh, i, it) => { it.entry.mesh = mesh; it.entry.index = i; } })); }
   ctx.parkedCars = carCount;
 
   // Planters with flowers along park paths, flower beds in parks and temple lawns.

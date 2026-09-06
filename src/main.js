@@ -25,6 +25,7 @@ import { CameraRig } from './car/camera.js';
 import { Missions, fmtTime } from './game/missions.js';
 import { loadPlotData } from './game/plots.js';
 import { Minimap } from './ui/minimap.js';
+import { CarSwap } from './game/swap.js';
 import { UI } from './ui/hud.js';
 import { clamp, lerp } from './util/math.js';
 
@@ -88,6 +89,9 @@ async function boot() {
   const carVisual = new CarVisual(scene, ctx.T, carModel);
   const rig = new CameraRig(camera, settings);
   const missions = new Missions(scene, world, settings, audio, ui);
+  const swap = new CarSwap(ctx, car, carVisual, rig, ui, audio);
+  input.on('swap', () => { if (G.phase === 'drive' && !G.overlay) swap.swap(); });
+  $('swap-btn').onclick = () => swap.swap();
   const minimap = new Minimap(world, $('minimap'), $('bigmap-canvas'));
   minimap.mode = settings.get('minimapMode');
   ctx.lighting.set(settings.get('timeOfDay')); ctx.lighting.update(1, { x: 1500, z: 1500 });
@@ -278,7 +282,7 @@ async function boot() {
       minimap.draw(car, missions.active ? missions.active.rings.filter((r, i) => !missions.done.has(i)) : [], missions.target());
       // Nearest plot every 0.25 s; card after 1 s stopped within 20 m.
       G.nearestTimer += dt;
-      if (G.nearestTimer > 0.25) { G.nearestTimer = 0; lastNearestPick = ui.updateNearest(car, world); }
+      if (G.nearestTimer > 0.25) { G.nearestTimer = 0; lastNearestPick = ui.updateNearest(car, world); swap.update(); }
       const stopped = Math.abs(car.speed) < CONFIG.ui.plotCardSpeed;
       G.stillTimer = stopped ? G.stillTimer + dt : 0;
       if (input.throttle > 0.5 && ui.cardPlot) ui.hideCard();
@@ -298,6 +302,6 @@ async function boot() {
   const loop = new Loop(sim, render);
   ui.hideLoading(); ui.showTitle(settings.get('bestLap'));
   loop.start();
-  window.__svd = { car, world, ctx, rig, missions, settings, teleportTo, startDrive, finishSwoop, G, carVisual, loop };
+  window.__svd = { car, world, ctx, rig, missions, settings, teleportTo, startDrive, finishSwoop, G, carVisual, loop, swap };
 }
 boot().catch((e) => { console.error('[boot] ' + (e && e.stack ? e.stack : String(e))); ui.fatal((e && (e.message || e.stack)) || String(e)); });

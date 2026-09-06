@@ -16,6 +16,6 @@ npm run dev      # http://localhost:5173
 npm run build    # dist/
 ```
 
-Controls: W/S throttle & brake, A/D steer, Space handbrake, Shift boost, C camera, R reset, N time of day, T teleport, M map, Tab missions, X mute, Esc pause, backtick debug + handling tuner. URL params: `?at=villa-12`, `?tod=night`, `?quality=low`.
+Controls: W/S throttle & brake, A/D steer, Space handbrake, Shift boost, E swap into a nearby parked car, C camera, R reset, N time of day, T teleport, M map, Tab missions, X mute, Esc pause, backtick debug + handling tuner. URL params: `?at=villa-12`, `?tod=night`, `?quality=low`.
 
 See `DRIVE_GAME_SPEC.md` for the full specification, engineering review and test plan.

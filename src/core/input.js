@@ -27,7 +27,7 @@ export class Input {
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     const k = e.code;
     if (down && !e.repeat) {
-      const map = { KeyC: 'camera', KeyR: 'reset', KeyN: 'timeOfDay', KeyT: 'teleport', KeyM: 'map', Tab: 'missions', KeyX: 'mute', Escape: 'pause', Backquote: 'debug', KeyH: 'help', Enter: 'confirm' };
+      const map = { KeyC: 'camera', KeyR: 'reset', KeyN: 'timeOfDay', KeyT: 'teleport', KeyM: 'map', Tab: 'missions', KeyX: 'mute', Escape: 'pause', Backquote: 'debug', KeyH: 'help', Enter: 'confirm', KeyE: 'swap' };
       if (map[k]) { this.fire(map[k], e); if (k === 'Tab') e.preventDefault(); }
     }
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(k)) e.preventDefault();

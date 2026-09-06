@@ -6,8 +6,10 @@ import { clamp, lerp } from '../util/math.js';
 
 // Loads the SUV GLTF (override at /models/suv.glb, else the Kenney suv), bakes body + one wheel geometry,
 // recolours the paint to the brand colour and returns {body, wheel, wheelPositions, length}.
-export async function loadCarModel() {
-  const tryUrls = [CONFIG.car.overrideModel, CONFIG.car.model];
+export async function loadCarModel() { return loadCarModelFrom([CONFIG.car.overrideModel, CONFIG.car.model], CONFIG.brandColor, CONFIG.car.length); }
+// Load any Kenney-style car (body + wheel-<front|back>-<left|right> nodes) as a drivable model with the given paint.
+export async function loadCarModelFrom(urls, paintHex, length) {
+  const tryUrls = Array.isArray(urls) ? urls : [urls];
   for (const url of tryUrls) {
     try {
       const head = await fetch(url, { method: 'HEAD' }); if (!head.ok || /text\/html/.test(head.headers.get('content-type') || '')) continue;
@@ -33,7 +35,7 @@ export async function loadCarModel() {
       if (flip) { body.geo.rotateY(Math.PI); if (wheel) wheel.rotateY(Math.PI); wheelPositions.forEach((w) => { w.p.x = -w.p.x; w.p.z = -w.p.z; }); }
       // Scale to the configured length, ground at 0, centred on x/z.
       body.geo.computeBoundingBox(); const bb = body.geo.boundingBox; const size = new THREE.Vector3(); bb.getSize(size);
-      const s = CONFIG.car.length / size.z;
+      const s = length / size.z;
       const cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2;
       body.geo.translate(-cx, 0, -cz); body.geo.scale(s, s, s);
       if (wheel) { wheel.scale(s, s, s); wheelPositions.forEach((w) => { w.p.x = (w.p.x - cx) * s; w.p.y *= s; w.p.z = (w.p.z - cz) * s; }); }
@@ -43,11 +45,11 @@ export async function loadCarModel() {
       body.geo.translate(0, -groundY, 0); wheelPositions.forEach((w) => { w.p.y -= groundY; });
       // Paint: repaint the palette texture cells matching the dominant body colour with the brand colour.
       let map = null;
-      if (body.paletteMap && body.paintColors && body.paintColors.length) map = recolorPalette(body.paletteMap, body.paintColorsWide && body.paintColorsWide.length ? body.paintColorsWide : body.paintColors, CONFIG.brandColor, body.dominant);
+      if (body.paletteMap && body.paintColors && body.paintColors.length) map = recolorPalette(body.paletteMap, body.paintColorsWide && body.paintColorsWide.length ? body.paintColorsWide : body.paintColors, paintHex, body.dominant);
       else if (body.paletteMap) map = body.paletteMap;
       body.geo.computeBoundingBox();
       console.log('[car] model', url, 'wheels', wheelPositions.length, 'flip', flip);
-      return { body: body.geo, wheel, wheelPositions, wheelR, wheelOut, bbox: body.geo.boundingBox, map, wheelMap: body.paletteMap };
+      return { body: body.geo, wheel, wheelPositions, wheelR, wheelOut, bbox: body.geo.boundingBox, map, wheelMap: body.paletteMap, length, paintHex };
     } catch (e) { console.warn('[car] failed', url, e); }
   }
   return null;
@@ -55,7 +57,29 @@ export async function loadCarModel() {
 
 export class CarVisual {
   constructor(scene, T, model) {
+    this.scene = scene;
     this.root = new THREE.Group(); this.root.name = 'car';
+    this.build(model);
+    const N = 240; this.dustN = N;
+    const pos = new Float32Array(N * 3); const life = new Float32Array(N).fill(-1);
+    this.dustGeo = new THREE.BufferGeometry(); this.dustGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.dustLife = life; this.dustVel = new Float32Array(N * 3);
+    const mat = new THREE.PointsMaterial({ color: 0xc9b58f, size: 1.6, transparent: true, opacity: 0.5, depthWrite: false, sizeAttenuation: true });
+    this.dust = new THREE.Points(this.dustGeo, mat); this.dust.frustumCulled = false; scene.add(this.dust);
+    this.dustNext = 0;
+    this.bounce = 0; this.bounceV = 0; this.pitch = 0; this.roll = 0;
+    scene.add(this.root);
+  }
+  // Swap the visible car: tear down chassis, wheels and lights, rebuild from another model.
+  setModel(model) { for (const c of [...this.root.children]) this.root.remove(c); this.build(model); this.setNight(this._night); }
+  // A static copy of the current car (body + wheels, no lights) for leaving it parked.
+  makeParkedCopy() {
+    const g = new THREE.Group();
+    this.root.traverse((o) => { if (o.isMesh && !o.isPoints && !(o.material === this.headMat || o.material === this.tailMat)) { const m = new THREE.Mesh(o.geometry, o.material); o.updateWorldMatrix(true, false); m.matrixAutoUpdate = false; m.matrix.copy(o.matrixWorld).premultiply(new THREE.Matrix4().copy(this.root.matrixWorld).invert()); m.castShadow = true; g.add(m); } });
+    return g;
+  }
+  build(model) {
+    this.model = model;
     this.chassis = new THREE.Group(); this.root.add(this.chassis);
     const brand = CONFIG.brandColor;
     this.wheels = [];
@@ -101,17 +125,9 @@ export class CarVisual {
       const s = new THREE.SpotLight(0xfff1cc, 0, 80, 0.42, 0.6, 1.4); s.position.set(sx * hx, hy, frontZ + 0.1); s.target.position.set(sx * hx, 0.2, frontZ - 30);
       this.chassis.add(s); this.chassis.add(s.target); s.visible = false; this.spots.push(s);
     }
-    const N = 240; this.dustN = N;
-    const pos = new Float32Array(N * 3); const life = new Float32Array(N).fill(-1);
-    this.dustGeo = new THREE.BufferGeometry(); this.dustGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    this.dustLife = life; this.dustVel = new Float32Array(N * 3);
-    const mat = new THREE.PointsMaterial({ color: 0xc9b58f, size: 1.6, transparent: true, opacity: 0.5, depthWrite: false, sizeAttenuation: true });
-    this.dust = new THREE.Points(this.dustGeo, mat); this.dust.frustumCulled = false; scene.add(this.dust);
-    this.dustNext = 0;
-    this.bounce = 0; this.bounceV = 0; this.pitch = 0; this.roll = 0;
-    scene.add(this.root);
+    this.halfLength = (bbox.max.z - bbox.min.z) / 2; this.halfWidth = (bbox.max.x - bbox.min.x) / 2;
   }
-  setNight(on) { this.spots.forEach((s) => { s.visible = on; s.intensity = on ? 180 : 0; }); this.headMat.emissiveIntensity = on ? 2.5 : 0.4; }
+  setNight(on) { this._night = on; this.spots.forEach((s) => { s.visible = on; s.intensity = on ? 180 : 0; }); this.headMat.emissiveIntensity = on ? 2.5 : 0.4; }
   update(dt, car, alpha, input, now) {
     const x = lerp(car.px, car.x, alpha), z = lerp(car.pz, car.z, alpha);
     const yaw = car.pyaw + ((car.yaw - car.pyaw + Math.PI * 3) % (Math.PI * 2) - Math.PI) * alpha;

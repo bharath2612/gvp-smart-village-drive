@@ -55,6 +55,7 @@ export class UI {
   hideTitle() { this.el.title.classList.add('hidden'); }
   showHud() { this.el.hud.classList.remove('hidden'); }
   toast(text, seconds = 4) { this.el.toast.textContent = text; this.el.toast.classList.add('show'); this.toastTimer = seconds; }
+  showSwapPrompt(text) { const el = $('swap-prompt'); if (!text) { el.classList.remove('show'); return; } $('swap-text').textContent = text; el.classList.add('show'); }
   setWrongWay(on) { this.el.wrong.classList.toggle('show', on); }
   showControls(seconds) { this.el.controls.classList.add('show'); clearTimeout(this._ct); if (seconds) this._ct = setTimeout(() => this.el.controls.classList.remove('show'), seconds * 1000); }
   hideControls() { this.el.controls.classList.remove('show'); }

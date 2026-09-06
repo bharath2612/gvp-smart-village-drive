@@ -1,0 +1,6 @@
+{
+  "_note": "Availability by plot id: available | reserved | sold. Missing ids are available. Edit in the repo for now.",
+  "villa-1": "reserved",
+  "villa-12": "available",
+  "townhouse-1": "sold"
+}

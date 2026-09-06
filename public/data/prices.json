@@ -1,0 +1,14 @@
+{
+  "_note": "Indicative pricing from PHASE_3_SPEC_DOCUMENT.md. Villa type rule: corner plot -> D, within 70 m of a farm cell -> C, otherwise B (Garden). Lakeside type A does not occur: no villa plot borders the lake in the verified layout. Confirm with sales before publishing.",
+  "villa": {
+    "A": { "name": "Type A · Lakeside", "priceCr": 12, "builtUp": "5,000 sft", "config": "4 BHK" },
+    "B": { "name": "Type B · Garden", "priceCr": 10, "builtUp": "5,000 sft", "config": "4 BHK" },
+    "C": { "name": "Type C · Farm adjacent", "priceCr": 10.5, "builtUp": "5,500 sft", "config": "4 BHK" },
+    "D": { "name": "Type D · Corner", "priceCr": 11, "builtUp": "6,000 sft", "config": "5 BHK" }
+  },
+  "townhouse": {
+    "standard": { "name": "TH Standard", "priceCr": 2.3, "builtUp": "3,500 sft", "config": "3 BHK" },
+    "premium": { "name": "TH Premium (end of row)", "priceCr": 2.7, "builtUp": "4,000 sft", "config": "4 BHK" }
+  },
+  "farm": { "income": "₹25–30 L / year" }
+}

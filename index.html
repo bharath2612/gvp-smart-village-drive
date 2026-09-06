@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart Village Drive · GVP Smart Village</title>
+  <meta name="description" content="Drive through the full 3 km x 3 km GVP Smart Village master plan at real scale: 564 farm plots, 560 premium villas, 504 town houses, commercial spine, lake and amenities." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230a0f1c'/%3E%3Ctext x='32' y='44' font-size='36' text-anchor='middle' fill='%23c9a227' font-family='Georgia'%3ESV%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <canvas id="gl"></canvas>
+  <div id="loading" class="screen"><div class="logo">GVP Smart Village</div><h1>Smart Village Drive</h1><div class="bar"><div id="load-bar"></div></div><div id="load-text">Loading layout…</div></div>
+  <div id="title" class="screen hidden">
+    <div class="logo">GVP Smart Village · SV-1</div>
+    <h1>Smart Village Drive</h1>
+    <div class="sub">3 km × 3 km at real scale · 564 farms · 560 villas · 504 town houses · one SUV</div>
+    <div id="best-lap"></div>
+    <div><button id="start-btn" class="btn gold">Start driving</button></div>
+    <div><button id="title-missions" class="btn small">Missions</button><button id="title-settings" class="btn small">Settings</button><a class="btn small" href="https://gvp-smart-village-plan.vercel.app" target="_blank" rel="noopener">2D plan viewer</a></div>
+    <div class="credits">Procedural world generated from the measurement-verified master plan · all textures, models and sounds synthesised in-browser · see CREDITS.md</div>
+  </div>
+  <div id="hud" class="hidden">
+    <div id="nearest-wrap" class="panel"><div class="lbl">Nearest plot</div><div id="nearest">Open road</div></div>
+    <div id="compass" class="panel"><div id="compass-heading">N 0°</div><div id="zone">Commercial spine</div></div>
+    <div id="top-right"><button id="tod-btn" class="btn">☀ Day</button><button id="mute-btn" class="btn">🔊</button><button id="pause-btn" class="btn">☰</button></div>
+    <div id="mission-timer" class="panel"></div>
+    <div id="mission-arrow"><svg viewBox="0 0 40 40"><path d="M20 3 L34 30 L20 23 L6 30 Z" fill="#c9a227" stroke="#0a0f1c" stroke-width="1.5"/></svg></div>
+    <div id="mission-dist"></div>
+    <div id="wrongway">WRONG WAY</div>
+    <div id="speedo" class="panel"><div id="speed">0</div><div class="unit">KM/H</div><div id="boost"><div id="boost-bar"></div></div><div class="row"><span id="gear">D</span><span id="hb">HANDBRAKE</span><span id="cam-mode">chase</span></div></div>
+    <canvas id="minimap" class="panel" width="220" height="220"></canvas>
+    <div id="toast" class="panel"></div>
+    <div id="plot-card" class="panel"></div>
+    <div id="controls-card" class="panel">
+      <span><b>W / ↑</b> throttle</span><span><b>S / ↓</b> brake · reverse</span>
+      <span><b>A D / ← →</b> steer</span><span><b>Space</b> handbrake</span>
+      <span><b>Shift</b> boost</span><span><b>C</b> camera</span>
+      <span><b>R</b> reset to road</span><span><b>N</b> time of day</span>
+      <span><b>T</b> teleport to plot</span><span><b>M</b> map</span>
+      <span><b>Tab</b> missions</span><span><b>Esc</b> pause · settings</span>
+      <span><b>Mouse drag</b> orbit when stopped</span><span><b>H</b> this card</span>
+    </div>
+    <div id="debug" class="panel hidden"></div>
+  </div>
+  <div id="pause" class="overlay hidden"><div class="panel"><h2>Paused</h2><div class="list"><button class="btn" data-act="resume">Resume</button><button class="btn" data-act="missions">Missions</button><button class="btn" data-act="settings">Settings</button><button class="btn" data-act="controls">Controls</button><button class="btn" data-act="restart">Restart at the gate</button></div></div></div>
+  <div id="missions" class="overlay hidden"><div class="panel"><h2>Missions</h2><div id="mission-list"></div><div style="margin-top:14px"><button class="btn" data-act="abandon">Abandon current</button><button class="btn" data-act="close">Close</button></div></div></div>
+  <div id="settings" class="overlay hidden"><div class="panel"><h2>Settings</h2>
+    <div class="setting"><span>Quality</span><select id="s-quality"><option value="auto">Auto</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+    <div class="setting"><span>Time of day</span><select id="s-tod"><option value="day">Day</option><option value="sunset">Sunset</option><option value="night">Night</option></select></div>
+    <div class="setting"><span>Master volume</span><input id="s-master" type="range" min="0" max="100"></div>
+    <div class="setting"><span>Engine volume</span><input id="s-engine" type="range" min="0" max="100"></div>
+    <div class="setting"><span>Ambience volume</span><input id="s-ambience" type="range" min="0" max="100"></div>
+    <div class="setting"><span>Chase distance</span><select id="s-chase"><option value="near">Near</option><option value="normal">Normal</option><option value="far">Far</option></select></div>
+    <div class="setting"><span>Invert steering</span><input id="s-invert" type="checkbox"></div>
+    <div class="setting"><span>Minimap</span><select id="s-minimap"><option value="north">North-up</option><option value="rotate">Rotating</option></select></div>
+    <div style="margin-top:14px"><button class="btn" data-act="close">Close</button></div><div style="font-size:11px;color:rgba(245,245,245,0.5);margin-top:10px">Quality changes apply after reload.</div></div></div>
+  <div id="teleport" class="overlay hidden"><div class="panel"><h2>Teleport to plot</h2><input id="tp-input" placeholder="villa 245, farm 12, th 83, commercial 7, temple, lake…" autocomplete="off"><div id="tp-list"></div><div style="margin-top:10px;font-size:12px;color:rgba(245,245,245,0.6)">Enter to go · Esc to close</div></div></div>
+  <div id="bigmap" class="hidden"><canvas id="bigmap-canvas" width="1600" height="1600"></canvas><div class="hint">M or Esc closes · <a href="https://gvp-smart-village-plan.vercel.app" target="_blank" rel="noopener">open the measured 2D plan viewer</a></div></div>
+  <div id="complete"><div class="panel"><h2 id="complete-title">Complete</h2><div id="complete-body"></div><button class="btn gold" data-act="driveon">Drive on</button><button class="btn" data-act="next">Missions</button></div></div>
+  <div id="resume-count"></div>
+  <div id="splash" class="splash-fade"></div>
+  <div id="tuning" class="panel hidden"></div>
+  <div id="fatal" hidden><h2>Cannot start</h2><p></p></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -3,4 +3,4 @@ dist/
 .vercel/
 .DS_Store
 .claude/
-.vercel
+build/

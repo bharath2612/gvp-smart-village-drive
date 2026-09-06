@@ -74,6 +74,27 @@ export function buildLights(ctx) {
   // Stadium floodlight pools over the pitch and stands.
   const st = world.amenities.find((a) => a.id === 'stadium');
   if (st) { const cx = st.x + st.w / 2, cz = st.y + st.h / 2; const items = [{ x: cx, z: cz, sx: 190, sy: 1, sz: 200 }]; for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) items.push({ x: cx + sx * 60, z: cz + sz * 55, sx: 90, sy: 1, sz: 90 }); scene.add(instancedChunks(disc, stadiumMat, items, { name: 'light-pools-stadium', chunk: 1000 })); }
+  // Temple: uplight pools at the tower corners and mandapa, plus soft warm light beams rising up the gopuram.
+  if (temple) {
+    const cx = temple.x + temple.w / 2, cz = temple.y + temple.h / 2, tz = cz - 8, mz = cz + 18;
+    const tp = [{ x: cx, z: tz, sx: 46, sy: 1, sz: 46 }, { x: cx, z: mz, sx: 44, sy: 1, sz: 44 }];
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) tp.push({ x: cx + sx * 17, z: tz + sz * 17, sx: 18, sy: 1, sz: 18 });
+    const templePoolMat = poolMaterial(ctx, warm, 0.9, 0xfff1d6);
+    scene.add(instancedChunks(disc, templePoolMat, tp, { name: 'light-pools-temple', chunk: 1000 }));
+    const bc = document.createElement('canvas'); bc.width = 32; bc.height = 256; const bg = bc.getContext('2d');
+    const grad = bg.createLinearGradient(0, 256, 0, 0); grad.addColorStop(0, 'rgba(255,225,170,0.9)'); grad.addColorStop(0.35, 'rgba(255,210,150,0.35)'); grad.addColorStop(1, 'rgba(255,200,140,0)');
+    bg.fillStyle = grad; bg.fillRect(0, 0, 32, 256);
+    const side = bg.createLinearGradient(0, 0, 32, 0); side.addColorStop(0, 'rgba(0,0,0,1)'); side.addColorStop(0.5, 'rgba(0,0,0,0)'); side.addColorStop(1, 'rgba(0,0,0,1)');
+    bg.globalCompositeOperation = 'destination-out'; bg.fillStyle = side; bg.fillRect(0, 0, 32, 256);
+    const beamTex = new THREE.CanvasTexture(bc); beamTex.colorSpace = THREE.SRGBColorSpace;
+    const beamMat = new THREE.MeshBasicMaterial({ map: beamTex, color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+    beamMat.userData.maxOpacity = 0.55; beamMat.visible = false; ctx.poolMats.push(beamMat);
+    const beamGeo = new THREE.PlaneGeometry(4.5, 38); beamGeo.translate(0, 19 + 1.5, 0);
+    const beams = new THREE.Group();
+    const spots = [[-15.5, -15.5], [15.5, -15.5], [-15.5, 15.5], [15.5, 15.5], [0, -16.2], [0, 16.2], [-16.2, 0], [16.2, 0]];
+    for (const [dx, dz] of spots) for (const rot of [0, Math.PI / 2]) { const m = new THREE.Mesh(beamGeo, beamMat); m.position.set(cx + dx, 0, tz + dz); m.rotation.y = rot; beams.add(m); }
+    beams.name = 'temple-beams'; scene.add(beams);
+  }
   // Gate house and temple plinth wash.
   const gate = [{ x: 1500, z: 2985, sx: 40, sy: 1, sz: 24 }];
   if (temple) gate.push({ x: temple.x + temple.w / 2, z: temple.y + temple.h / 2, sx: 80, sy: 1, sz: 80 });

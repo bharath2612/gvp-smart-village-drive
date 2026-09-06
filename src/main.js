@@ -214,7 +214,8 @@ async function boot() {
   input.on('confirm', () => { if (G.phase === 'title' && !G.overlay) startDrive(); });
   input.on('debug', () => { $('debug').classList.toggle('hidden'); $('tuning').classList.toggle('hidden'); if (!$('tuning').children.length) buildTuning(); });
   $('start-btn').onclick = () => startDrive();
-  document.addEventListener('visibilitychange', () => { if (G.phase !== 'drive') return; if (document.hidden) { loop.paused = true; G.resumeCount = 0; } else if (!G.overlay) { G.resumeCount = 3; ui.showResume(3); } });
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => { if (G.phase !== 'drive') return; if (document.hidden) { loop.paused = true; G.resumeCount = 0; hiddenAt = performance.now(); } else if (!G.overlay) { if (performance.now() - hiddenAt > 4000) { G.resumeCount = 3; ui.showResume(3); } else { loop.paused = false; ui.showResume(0); } } });
 
   function buildTuning() {
     const t = $('tuning'); t.innerHTML = '<b style="color:#c9a227">Handling (backtick toggles)</b>';

@@ -53,6 +53,8 @@ export function buildLighting(ctx) {
     if (ctx.lampHeadMat) ctx.lampHeadMat.emissiveIntensity = mix(a.lamps, b.lamps);
     if (ctx.glassMat) ctx.glassMat.emissiveIntensity = mix(a.windows, b.windows);
     if (ctx.bodyMat) ctx.bodyMat.emissiveIntensity = mix(a.windows, b.windows) * 0.22;
+    if (ctx.templeMat) ctx.templeMat.emissiveIntensity = mix(a.windows, b.windows) * 0.45;
+    if (ctx.templeLightMat) ctx.templeLightMat.emissiveIntensity = mix(a.lamps, b.lamps) * 1.3;
     const pools = mix(a.pools || 0, b.pools || 0); for (const m of ctx.poolMats || []) { m.opacity = pools * m.userData.maxOpacity; m.visible = pools > 0.02; }
     cur.night = mix(a.lamps, b.lamps) > 0.5;
     cur.ambience = blend > 0.5 ? b.ambience : a.ambience;

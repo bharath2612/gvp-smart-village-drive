@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { box, cyl, merge } from '../world/geo.js';
-import { bakeGeometry, recolor, recolorHue, hueOf, loadGLTF } from '../world/models.js';
+import { bakeGeometry, recolorPalette, loadGLTF } from '../world/models.js';
 import { clamp, lerp } from '../util/math.js';
 
 // Loads the SUV GLTF (override at /models/suv.glb, else the Kenney suv), bakes body + one wheel geometry,
@@ -38,12 +38,13 @@ export async function loadCarModel() {
       let wheelR = 0.38; if (wheel) { wheel.computeBoundingBox(); wheelR = (wheel.boundingBox.max.y - wheel.boundingBox.min.y) / 2; }
       const groundY = wheelPositions.length ? Math.min(...wheelPositions.map((w) => w.p.y)) - wheelR : bb.min.y * s;
       body.geo.translate(0, -groundY, 0); wheelPositions.forEach((w) => { w.p.y -= groundY; });
-      // Paint = dominant colour, but never the dark glass, tyres or chrome. Slight boost so the brand blue reads under tone mapping.
-      const paint = new THREE.Color(CONFIG.brandColor).multiplyScalar(1.35);
-      if (body.dominant) { const h = hueOf(body.dominant); console.log('[car] paint hue', h.h.toFixed(2), 'sat', h.s.toFixed(2)); if (h.s > 0.18) recolorHue(body.geo, h.h, paint, 0.16); else recolor(body.geo, body.dominant, paint, 0.09, 0.12); }
+      // Paint: repaint the palette texture cells matching the dominant body colour with the brand colour.
+      let map = null;
+      if (body.paletteMap && body.paintColors && body.paintColors.length) map = recolorPalette(body.paletteMap, body.paintColorsWide && body.paintColorsWide.length ? body.paintColorsWide : body.paintColors, CONFIG.brandColor, body.dominant);
+      else if (body.paletteMap) map = body.paletteMap;
       body.geo.computeBoundingBox();
       console.log('[car] model', url, 'wheels', wheelPositions.length, 'flip', flip);
-      return { body: body.geo, wheel, wheelPositions, wheelR, bbox: body.geo.boundingBox };
+      return { body: body.geo, wheel, wheelPositions, wheelR, bbox: body.geo.boundingBox, map };
     } catch (e) { console.warn('[car] failed', url, e); }
   }
   return null;
@@ -57,10 +58,10 @@ export class CarVisual {
     this.wheels = [];
     let bbox;
     if (model) {
-      const paint = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.35 });
+      const paint = model.map ? new THREE.MeshStandardMaterial({ map: model.map, roughness: 0.4, metalness: 0.3 }) : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.35 });
       const bodyMesh = new THREE.Mesh(model.body, paint); bodyMesh.castShadow = true; bodyMesh.receiveShadow = true; this.chassis.add(bodyMesh);
       bbox = model.bbox;
-      const wheelMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.2 });
+      const wheelMat = model.map ? new THREE.MeshStandardMaterial({ map: model.map, roughness: 0.8, metalness: 0.2 }) : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.2 });
       const wp = model.wheelPositions.length >= 4 ? model.wheelPositions : [[-0.86, -1.45], [0.86, -1.45], [-0.86, 1.45], [0.86, 1.45]].map(([x, z], i) => ({ name: i < 2 ? 'front' : 'back', p: new THREE.Vector3(x, 0.38, z) }));
       for (const w of wp) {
         const pivot = new THREE.Group(); pivot.position.copy(w.p);

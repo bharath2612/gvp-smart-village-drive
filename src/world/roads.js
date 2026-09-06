@@ -13,7 +13,8 @@ export function junctionIntervals(road, roads) {
     // Roads that merely touch (a 20 m road ending on the boundary road) still form a junction mouth.
     if (ix1 - ix0 < -0.5 || iz1 - iz0 < -0.5) continue;
     if (ix1 - ix0 <= 0.5 && iz1 - iz0 <= 0.5) continue; // corner touch only
-    out.push(road.horizontal ? [ix0 - 1, ix1 + 1] : [iz0 - 1, iz1 + 1]);
+    // Intervals are relative to the road's own start so they can be subtracted from [0, len].
+    out.push(road.horizontal ? [ix0 - road.x - 1, ix1 - road.x + 1] : [iz0 - road.y - 1, iz1 - road.y + 1]);
   }
   return out;
 }
@@ -50,8 +51,12 @@ export function buildRoads(ctx) {
         kerbs.push(kg);
       }
       if (verge) {
-        verges.push(along(a, verge / 2, 0.075, verge, b - a)); verges.push(along(a, wid - verge / 2, 0.075, verge, b - a));
-        for (const side of [verge, wid - verge]) kerbs.push(r.horizontal ? box(b - a, 0.12, 0.25, 0xb9b7b0, { x: r.x + a + (b - a) / 2, z: r.y + side }) : box(0.25, 0.12, b - a, 0xb9b7b0, { x: r.x + side, z: r.y + a + (b - a) / 2 }));
+        const va = a === 0 ? 0 : a + 4, vb = b === len ? len : b - 4;
+        if (vb - va >= 6) {
+        verges.push(along(va, verge / 2, 0.075, verge, vb - va)); verges.push(along(va, wid - verge / 2, 0.075, verge, vb - va));
+        for (const side of [verge, wid - verge]) kerbs.push(r.horizontal ? box(vb - va, 0.12, 0.25, 0xb9b7b0, { x: r.x + va + (vb - va) / 2, z: r.y + side }) : box(0.25, 0.12, vb - va, 0xb9b7b0, { x: r.x + side, z: r.y + va + (vb - va) / 2 }));
+        for (const end of [a === 0 ? null : va, b === len ? null : vb]) if (end !== null) for (const side of [verge / 2, wid - verge / 2]) kerbs.push(r.horizontal ? box(0.25, 0.12, verge, 0xb9b7b0, { x: r.x + end, z: r.y + side }) : box(verge, 0.12, 0.25, 0xb9b7b0, { x: r.x + side, z: r.y + end }));
+        }
       }
       // Centre dashes on 15 m and wider (not the spine: it has a median).
       if (!isSpine && (r.kind === '15m' || r.kind === '20m' || r.kind === '25m')) {

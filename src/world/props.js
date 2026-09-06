@@ -1,7 +1,7 @@
 // Small props from the Kenney kits: parked cars, planters and flowers, shore rocks, temple columns.
 import * as THREE from 'three';
 import { instancedChunks } from './instancing.js';
-import { recolor, recolorHue, hueOf } from './models.js';
+import { recolorPalette } from './models.js';
 import { rng, hashStr } from '../util/math.js';
 
 const CAR_COLOURS = [0xd8dde2, 0x1e4fa3, 0xb8302a, 0x2f2f33, 0xe8e2d0, 0x6b7f8f];
@@ -17,9 +17,11 @@ export function buildProps(ctx) {
   const carKeys = ['sedan', 'suv-luxury', 'hatchback-sports', 'van', 'sedan-sports', 'taxi'].filter((k) => models[k]);
   const variants = [];
   for (const k of carKeys) for (let v = 0; v < 3; v++) {
-    const src = models[k]; const geo = src.geo.clone();
-    if (src.dominant) { const h = hueOf(src.dominant); const to = CAR_COLOURS[(hashStr(k) + v * 2) % CAR_COLOURS.length]; if (h.s > 0.18) recolorHue(geo, h.h, to, 0.08); else recolor(geo, src.dominant, to, 0.1, 0.12); }
-    variants.push({ geo, items: [], size: src.size });
+    const src = models[k];
+    const to = CAR_COLOURS[(hashStr(k) + v * 2) % CAR_COLOURS.length];
+    const map = src.paletteMap && src.paintColors && src.paintColors.length ? recolorPalette(src.paletteMap, src.paintColors, to, src.dominant) : src.paletteMap;
+    const m = map ? new THREE.MeshStandardMaterial({ map, roughness: 0.55, metalness: 0.15 }) : mat;
+    variants.push({ geo: src.geo, mat: m, items: [], size: src.size });
   }
   const park = (x, z, rot) => { const v = variants[Math.floor(r() * variants.length)]; v.items.push({ x, z, rot }); const hw = 1.1, hl = 2.5; const c = Math.abs(Math.cos(rot)) > 0.5 ? [hw, hl] : [hl, hw]; colliders.add(x - c[0], z - c[1], x + c[0], z + c[1], 'car'); };
   for (const p of world.plots) {
@@ -32,7 +34,7 @@ export function buildProps(ctx) {
   const lot = world.amenities.find((a) => a.id === 'parking');
   if (lot) for (let z = lot.y + 13; z < lot.y + lot.h - 13; z += 6) { if (r() < 0.45) park(lot.x + 28, z, -Math.PI / 2); if (r() < 0.45) park(lot.x + lot.w - 28, z, Math.PI / 2); }
   let carCount = 0;
-  for (const v of variants) { if (!v.items.length) continue; carCount += v.items.length; scene.add(instancedChunks(v.geo, mat, v.items, { name: 'parked-cars', chunk: 400, castShadow: true })); }
+  for (const v of variants) { if (!v.items.length) continue; carCount += v.items.length; scene.add(instancedChunks(v.geo, v.mat, v.items, { name: 'parked-cars', chunk: 400, castShadow: true })); }
   ctx.parkedCars = carCount;
 
   // Planters with flowers along park paths, flower beds in parks and temple lawns.

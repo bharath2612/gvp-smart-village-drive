@@ -64,7 +64,7 @@ export function buildRoads(ctx) {
       if (path) {
         footpaths.push(along(va, path / 2, 0.11, path, vb - va)); footpaths.push(along(va, wid - path / 2, 0.11, path, vb - va));
         for (const side of [path, wid - path]) kerbs.push(r.horizontal ? box(vb - va, 0.14, 0.22, 0xc9c5bb, { x: r.x + va + (vb - va) / 2, z: r.y + side }) : box(0.22, 0.14, vb - va, 0xc9c5bb, { x: r.x + side, z: r.y + va + (vb - va) / 2 }));
-        for (let t = va + 4; t < vb - 2; t += 12) for (const side of [0.6, wid - 0.6]) { const x = r.horizontal ? r.x + t : r.x + side, z = r.horizontal ? r.y + side : r.y + t; bollardItems.push({ x, z }); ctx.lightPoints.push({ x, z, r: 4.5, kind: 'bollard' }); }
+        for (let t = va + 4; t < vb - 2; t += 12) for (const side of [0.6, wid - 0.6]) { const x = r.horizontal ? r.x + t : r.x + side, z = r.horizontal ? r.y + side : r.y + t; if (world.nearAccess(x, z)) continue; bollardItems.push({ x, z }); ctx.lightPoints.push({ x, z, r: 4.5, kind: 'bollard' }); }
       }
     }
     // Edge lines and kerbs along non-junction segments.
@@ -87,6 +87,7 @@ export function buildRoads(ctx) {
           const sides = wide ? [inset, wid - inset] : [k % 2 ? inset : wid - inset];
           for (const side of sides) {
             const x = r.horizontal ? r.x + t : r.x + side, z = r.horizontal ? r.y + side : r.y + t;
+            if (world.nearAccess(x, z)) continue;
             const rot = r.horizontal ? (side < wid / 2 ? Math.PI : 0) : (side < wid / 2 ? -Math.PI / 2 : Math.PI / 2);
             lampItems.push({ x, z, rot, small: !wide });
             colliders.add(x - 0.3, z - 0.3, x + 0.3, z + 0.3, 'lamp');

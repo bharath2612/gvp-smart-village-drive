@@ -151,7 +151,13 @@ function derive(L) {
 
   const onRoad = (x, y) => { for (const r of roads) if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return r; return null; };
 
-  return { L, roads, plots, byId, plotsNear, zoneOf, onRoad, nearestRoad, lake: L.lake, parks: L.parks, amenities: L.amenities, site: L.site };
+  // Vehicle access points into fenced amenities: street trees, lamps and verge kerbs keep clear of these.
+  const stadium = L.amenities.find((a) => a.id === 'stadium'), school = L.amenities.find((a) => a.id === 'school');
+  const accessPoints = [];
+  if (stadium) accessPoints.push({ x: stadium.x + stadium.w, z: stadium.y + stadium.h / 2, r: 9, name: 'stadium gate' });
+  if (school) accessPoints.push({ x: 1514.9, z: school.y + school.h / 2, r: 8, name: 'school drive' });
+  const nearAccess = (x, z) => accessPoints.some((a) => Math.hypot(a.x - x, a.z - z) < a.r);
+  return { L, roads, plots, byId, plotsNear, zoneOf, onRoad, nearestRoad, lake: L.lake, parks: L.parks, amenities: L.amenities, site: L.site, accessPoints, nearAccess };
 }
 
 // Nearest road centreline point and heading (yaw, 0 = north/-Z, clockwise) for reset and teleport.

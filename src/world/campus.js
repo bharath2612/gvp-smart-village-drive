@@ -53,8 +53,17 @@ export function buildStadium(ctx) {
   addBand(4, 4, 0, 1.0, 0x1e4fa3, 0, Math.PI * 2, 96);
   glow.push(...[]);
   // Stands in sectors with tunnels at E (main), N, W and the pavilion at S.
-  const gaps = [[-0.075, 0.075], [-Math.PI / 2 - 0.075, -Math.PI / 2 + 0.075], [Math.PI - 0.075, Math.PI + 0.075], [Math.PI / 2 - 0.19, Math.PI / 2 + 0.19]];
-  const sectors = []; { const edges = gaps.map(([s, e]) => [((s % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI), ((e % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)]).sort((u, v) => u[0] - v[0]); for (let i = 0; i < edges.length; i++) { const s = edges[i][1], e = edges[(i + 1) % edges.length][0] + (i === edges.length - 1 ? 2 * Math.PI : 0); sectors.push([s, e]); } }
+  // North tunnel is offset 22 m west of the pitch axis so it does not open onto the sightscreen.
+  const NX = -22, nAng = Math.atan2(-(RZ + 14), NX);
+  // The tunnel is a straight strip while the stand gap is radial: size the gap so the strip (x = NX +/- 5) clears the
+  // stands at both the inner (RX + 4) and outer (RX + 24) radii.
+  const gapAt = (x, r) => Math.atan2(-(RZ + r) * 1, x);
+  const nGap = [Math.min(gapAt(NX - 5.5, 4), gapAt(NX - 5.5, 24)), Math.max(gapAt(NX + 5.5, 4), gapAt(NX + 5.5, 24))];
+  const gaps = [[-0.075, 0.075], nGap, [Math.PI - 0.075, Math.PI + 0.075], [Math.PI / 2 - 0.19, Math.PI / 2 + 0.19]];
+  // Sectors are the arcs between gaps. Normalise each gap's start to [0, 2pi) and keep its width, so a gap that
+  // straddles angle 0 (the east tunnel) does not wrap into a sector spanning the whole circle.
+  const sectors = []; { const TWO = Math.PI * 2; const edges = gaps.map(([s, e]) => { const st = ((s % TWO) + TWO) % TWO; return [st, st + (e - s)]; }).sort((u, v) => u[0] - v[0]);
+    for (let i = 0; i < edges.length; i++) { const s = edges[i][1], e = i === edges.length - 1 ? edges[0][0] + TWO : edges[i + 1][0]; if (e > s + 0.01) sectors.push([s, e]); } }
   const seatCols = [0x2c5f9e, 0xd9dde2, 0xc9a227, 0x2c5f9e];
   let tierTop = 0;
   sectors.forEach(([s0, s1], si) => {
@@ -90,23 +99,23 @@ export function buildStadium(ctx) {
     for (let ang = s0 + 0.1; ang < s1 - 0.05; ang += 0.21) { const x = cx + Math.cos(ang) * (RX + 23.5), z = cz + Math.sin(ang) * (RZ + 23.5); metal.push(cyl(0.3, 0.36, roofY + 3.4, 8, 0x8b949e, { x, z, y: (roofY + 3.4) / 2 })); }
   }
   // Tunnels through the stands at E, N, W: concrete floor, side walls, cove-lit portal.
-  for (const ang of [0, -Math.PI / 2, Math.PI]) {
+  for (const [ang, ox] of [[0, 0], [-Math.PI / 2, NX], [Math.PI, 0]]) {
     const dx = Math.cos(ang), dz = Math.sin(ang);
-    const px = (r) => cx + dx * (RX + r), pz = (r) => cz + dz * (RZ + r);
+    const px = (r) => cx + dx * (RX + r) + ox, pz = (r) => cz + dz * (RZ + r);
     const horizontal = Math.abs(dx) > 0.5; const len = 26, wid = 9;
     const x0 = Math.min(px(2), px(28)), z0 = Math.min(pz(2), pz(28));
-    paving.push(horizontal ? patchGeo(x0, cz - wid / 2, len, wid, 3, 0.08) : patchGeo(cx - wid / 2, z0, wid, len, 3, 0.08));
+    paving.push(horizontal ? patchGeo(x0, cz - wid / 2, len, wid, 3, 0.08) : patchGeo(cx + ox - wid / 2, z0, wid, len, 3, 0.08));
     for (const side of [-1, 1]) {
-      const wx = horizontal ? (px(2) + px(28)) / 2 : cx + side * (wid / 2 + 0.4), wz = horizontal ? cz + side * (wid / 2 + 0.4) : (pz(2) + pz(28)) / 2;
+      const wx = horizontal ? (px(2) + px(28)) / 2 : cx + ox + side * (wid / 2 + 0.4), wz = horizontal ? cz + side * (wid / 2 + 0.4) : (pz(2) + pz(28)) / 2;
       stone.push(horizontal ? box(len, 6, 0.8, 0xd9d5cc, { x: wx, z: wz, y: 3 }) : box(0.8, 6, len, 0xd9d5cc, { x: wx, z: wz, y: 3 }));
       solid(wx - (horizontal ? len / 2 : 0.4), wz - (horizontal ? 0.4 : len / 2), wx + (horizontal ? len / 2 : 0.4), wz + (horizontal ? 0.4 : len / 2));
       glow.push(horizontal ? box(len, 0.1, 0.12, 0xffe6c0, { x: wx, z: wz - side * 0.46, y: 5.6 }) : box(0.12, 0.1, len, 0xffe6c0, { x: wx - side * 0.46, z: wz, y: 5.6 }));
     }
     // Portal lintel with a sign.
-    const lx = horizontal ? px(27) : cx, lz = horizontal ? cz : pz(27);
+    const lx = horizontal ? px(27) : cx + ox, lz = horizontal ? cz : pz(27);
     stone.push(horizontal ? box(1.2, 1.4, wid + 1.6, 0xc9a227, { x: lx, z: lz, y: 6.6 }) : box(wid + 1.6, 1.4, 1.2, 0xc9a227, { x: lx, z: lz, y: 6.6 }));
     const sign = textBoard(8, 1.1, [ang === 0 ? 'MAIN ENTRANCE' : ang === Math.PI ? 'WEST GATE' : 'NORTH GATE'], '#0a0f1c', '#ffd35a', 'bold 90px Inter, sans-serif');
-    sign.position.set(horizontal ? px(28.2) : cx, 6.6, horizontal ? cz : pz(28.2)); sign.rotation.y = horizontal ? (dx > 0 ? Math.PI / 2 : -Math.PI / 2) : (dz > 0 ? 0 : Math.PI); scene.add(sign);
+    sign.position.set(horizontal ? px(28.2) : cx + ox, 6.6, horizontal ? cz : pz(28.2)); sign.rotation.y = horizontal ? (dx > 0 ? Math.PI / 2 : -Math.PI / 2) : (dz > 0 ? 0 : Math.PI); scene.add(sign);
   }
   // Pavilion at the south end: two storeys, ground-floor colonnade towards the field, members' balcony, hipped roof, clock board.
   { const pz0 = cz + RZ + 4, pw = 30, pd = 16, pcz = pz0 + pd / 2 + 2;
@@ -131,8 +140,9 @@ export function buildStadium(ctx) {
     board.position.set(x, tierTop + 8, z); board.lookAt(cx, tierTop + 8, cz); scene.add(board);
     for (const d of [-6, 6]) { const px2 = x + Math.cos(ang + Math.PI / 2) * d, pz2 = z + Math.sin(ang + Math.PI / 2) * d; metal.push(cyl(0.3, 0.35, tierTop + 12, 8, 0x8b949e, { x: px2, z: pz2, y: (tierTop + 12) / 2 })); } }
   // Six floodlight towers with lamp arrays (share the lamp emissive so they switch on at night).
-  for (let i = 0; i < 6; i++) {
-    const ang = (i / 6) * Math.PI * 2 + Math.PI / 6; const x = cx + Math.cos(ang) * (RX + 33), z = cz + Math.sin(ang) * (RZ + 33);
+  // Four corner towers plus two flanking the pavilion; none on the E/N/W tunnel axes.
+  for (const ang of [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4, Math.PI / 2 - 0.35, Math.PI / 2 + 0.35]) {
+    const x = cx + Math.cos(ang) * (RX + 33), z = cz + Math.sin(ang) * (RZ + 33);
     metal.push(cyl(0.6, 1.1, 42, 8, 0xbfc4cc, { x, z, y: 21 })); metal.push(box(1.8, 1.8, 1.8, 0x8b949e, { x, z, y: 42.2 }));
     const yaw = Math.atan2(cx - x, cz - z); const frame = box(8, 4.6, 0.5, 0x3a4048, { y: 44.5 }); frame.rotateY(yaw); frame.translate(x, 0, z); dark.push(frame);
     const lamps = new THREE.Group(); lamps.position.set(x, 44.5, z); lamps.rotation.y = yaw; const lampGeo = new THREE.BoxGeometry(1.4, 0.85, 0.25);
@@ -142,11 +152,12 @@ export function buildStadium(ctx) {
   // Perimeter fence with gates at the four sides (E gate is the vehicle entrance from the 25 m road).
   { const gw = 12; const seg = (x0, z0, x1, z1) => { const hz = Math.abs(x1 - x0) > Math.abs(z1 - z0); metal.push(hz ? box(Math.abs(x1 - x0), 2.2, 0.15, 0x3a4048, { x: (x0 + x1) / 2, z: z0, y: 1.1 }) : box(0.15, 2.2, Math.abs(z1 - z0), 0x3a4048, { x: x0, z: (z0 + z1) / 2, y: 1.1 })); solid(Math.min(x0, x1) - 0.2, Math.min(z0, z1) - 0.2, Math.max(x0, x1) + 0.2, Math.max(z0, z1) + 0.2); };
     const L = 1, R = a.x + a.w - 1, Tt = a.y + 1, B = a.y + a.h - 1, l = a.x + 1;
-    seg(l, Tt, cx - gw / 2, Tt); seg(cx + gw / 2, Tt, R, Tt); seg(l, B, cx - gw / 2, B); seg(cx + gw / 2, B, R, B);
+    const nx = cx + NX; seg(l, Tt, nx - gw / 2, Tt); seg(nx + gw / 2, Tt, R, Tt); seg(l, B, cx - gw / 2, B); seg(cx + gw / 2, B, R, B);
     seg(l, Tt, l, cz - gw / 2); seg(l, cz + gw / 2, l, B); seg(R, Tt, R, cz - gw / 2); seg(R, cz + gw / 2, R, B);
-    for (const [gx, gz, hz] of [[cx, Tt, true], [cx, B, true], [l, cz, false], [R, cz, false]]) { for (const s of [-1, 1]) stone.push(box(1.2, 3.2, 1.2, 0xe4dccd, { x: gx + (hz ? s * (gw / 2 + 0.6) : 0), z: gz + (hz ? 0 : s * (gw / 2 + 0.6)), y: 1.6 })); }
+    for (const [gx, gz, hz] of [[nx, Tt, true], [cx, B, true], [l, cz, false], [R, cz, false]]) { for (const s of [-1, 1]) stone.push(box(1.2, 3.2, 1.2, 0xe4dccd, { x: gx + (hz ? s * (gw / 2 + 0.6) : 0), z: gz + (hz ? 0 : s * (gw / 2 + 0.6)), y: 1.6 })); }
     // Driveway from the east gate to the main tunnel.
     paving.push(patchGeo(cx + RX + 28, cz - 6, R - (cx + RX + 28) + 1, 12, 3, 0.075));
+    paving.push(patchGeo(R, cz - 6, 4.6, 12, 3, 0.09)); // across the 25 m road's verge
     const gate = textBoard(10, 1.4, ['GVP CRICKET GROUND'], '#0a0f1c', '#ffd35a', 'bold 96px Georgia, serif'); gate.position.set(R - 0.3, 4.2, cz); gate.rotation.y = Math.PI / 2; scene.add(gate);
     stone.push(box(0.6, 0.8, gw + 2.4, 0xc9a227, { x: R, z: cz, y: 4.2 }));
   }
@@ -178,15 +189,17 @@ export function buildSchool(ctx) {
     stone.push(box(1.8, 1.2, gw + 3.2, 0xe4dccd, { x: l, z: cz, y: 5.6 })); stone.push(box(2.2, 0.4, gw + 3.6, 0xc9a227, { x: l, z: cz, y: 6.4 }));
     const sign = textBoard(9, 1.1, ['GVP SMART VILLAGE SCHOOL'], '#0a0f1c', '#ffd35a', 'bold 88px Georgia, serif'); sign.position.set(l - 1.0, 5.6, cz); sign.rotation.y = -Math.PI / 2; scene.add(sign);
     // Driveway from the spine's east edge to the gate (8 m pavers) and the internal drive to the plaza.
-    const spineEdge = 1514.9; paving.push(patchGeo(spineEdge, cz - 4, l - spineEdge, 8, 3, 0.075));
+    const spineEdge = 1514.9; paving.push(patchGeo(spineEdge - 3.2, cz - 4, l - spineEdge + 3.2, 8, 3, 0.09)); // starts inside the spine's verge
     paving.push(patchGeo(l, cz - 5, 40, 10, 3, 0.075));
     glow.push(box(0.12, 0.1, gw + 2, 0xffe6c0, { x: l + 0.9, z: cz, y: 5.0 }));
   }
   // Assembly plaza with a flagpole, benches and planters.
   const plazaX = a.x + 40, plazaW = 60, plazaD = 70;
   paving.push(patchGeo(plazaX, cz - plazaD / 2, plazaW, plazaD, 3, 0.075));
-  metal.push(cyl(0.08, 0.1, 14, 6, 0xdddddd, { x: plazaX + plazaW / 2, z: cz, y: 7 })); stone.push(cyl(1.4, 1.6, 0.6, 12, 0xd9d0c0, { x: plazaX + plazaW / 2, z: cz, y: 0.3 })); solid(plazaX + plazaW / 2 - 1.6, cz - 1.6, plazaX + plazaW / 2 + 1.6, cz + 1.6);
-  white.push(box(1.2, 0.8, 1.2, 0xd0342c, { x: plazaX + plazaW / 2, z: cz, y: 13.6 }));
+  // Flagpole off the driveway axis so the drive from the gate runs straight through the plaza.
+  const fpx = plazaX + plazaW / 2, fpz = cz - 14;
+  metal.push(cyl(0.08, 0.1, 14, 6, 0xdddddd, { x: fpx, z: fpz, y: 7 })); stone.push(cyl(1.4, 1.6, 0.6, 12, 0xd9d0c0, { x: fpx, z: fpz, y: 0.3 })); solid(fpx - 1.6, fpz - 1.6, fpx + 1.6, fpz + 1.6);
+  white.push(box(1.2, 0.8, 1.2, 0xd0342c, { x: fpx, z: fpz, y: 13.6 }));
   for (let i = 0; i < 6; i++) for (const s of [-1, 1]) { const x = plazaX + 8 + i * 9, z = cz + s * (plazaD / 2 - 3); dark.push(box(1.8, 0.08, 0.5, 0x5a3a24, { x, z, y: 0.5 })); dark.push(box(1.8, 0.4, 0.08, 0x5a3a24, { x, z: z - s * 0.25, y: 0.75 })); for (const dx of [-0.7, 0.7]) dark.push(box(0.1, 0.5, 0.5, 0x3a3f46, { x: x + dx, z, y: 0.25 })); solid(x - 1, z - 0.4, x + 1, z + 0.4); }
   // Academic block: three storeys, colonnaded portico, open corridors with columns on every floor, chajja sunshades.
   const blk = (x, z, w, d, floors, portico) => {

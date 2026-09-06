@@ -46,6 +46,7 @@ export function buildVegetation(ctx) {
       if (jx.some(([a, b]) => t > a - 6 && t < b + 6)) continue;
       for (const side of [1.5, wid - 1.5]) {
         const x = rd.horizontal ? rd.x + t : rd.x + side, z = rd.horizontal ? rd.y + side : rd.y + t;
+        if (world.nearAccess(x, z)) continue;
         addTree(x, z, rd.kind === 'spine' ? pick(PALMS) : pick(BROAD), true, 0.7 + r() * 0.2);
       }
     }

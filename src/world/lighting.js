@@ -61,7 +61,8 @@ export function buildLighting(ctx) {
       if (state.t < 1) { state.t = Math.min(1, state.t + dt / 0.9); applyPreset(state.target, state.t); if (state.t >= 1) state.current = state.target; }
       // Shadow frustum and sky follow the car.
       const d = cur.sunDir; sun.position.set(carPos.x + d.x * 400, d.y * 400, carPos.z + d.z * 400); sun.target.position.set(carPos.x, 0, carPos.z);
-      sky.position.set(carPos.x, 0, carPos.z);
+      // The sky dome follows the camera (not the car) so the title orbit and swoop never clip it.
+      const cp = ctx.camera ? ctx.camera.position : carPos; sky.position.set(cp.x, 0, cp.z);
     },
     get name() { return state.target; },
     get isNight() { return cur.night; },

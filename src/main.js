@@ -50,7 +50,7 @@ async function boot() {
   try { world = await loadLayout(); } catch (e) { ui.fatal(e.message); throw e; }
   await loadPlotData();
   const colliders = new ColliderGrid(50);
-  const ctx = { scene, renderer, world, colliders, qualityPreset: Q, qualityName, animate: [] };
+  const ctx = { scene, renderer, camera, world, colliders, qualityPreset: Q, qualityName, animate: [] };
   const steps = [
     ['Painting textures…', () => { ctx.T = buildTextures(qualityName); }],
     ['Laying the ground…', () => buildGround(ctx)],

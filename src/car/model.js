@@ -139,8 +139,12 @@ export class CarModel {
     if (maxImpact > 1.5) this.events.push({ type: 'impact', strength: Math.min(1, maxImpact / 25) });
     this.telemetry.impact = maxImpact;
     // Stuck guard: if still penetrating after 0.5 s, back out along the heading.
-    if (penetrated) { this.stuck += dt; if (this.stuck > this.h.stuckNudgeAfter) { const f = this.forward(); const s = Math.sign(this.speed || 1); this.x -= f.x * s * 0.6 * dt * 10; this.z -= f.z * s * 0.6 * dt * 10; this.vx *= 0.5; this.vz *= 0.5; } }
-    else this.stuck = 0;
+    if (penetrated) {
+      this.stuck += dt;
+      if (this.stuck > this.h.stuckNudgeAfter) { const f = this.forward(); const s = Math.sign(this.speed || 1); this.x -= f.x * s * 0.6 * dt * 10; this.z -= f.z * s * 0.6 * dt * 10; this.vx *= 0.5; this.vz *= 0.5; }
+      // Wedged between two colliders (house + compound wall): hand the car back to the road.
+      if (this.stuck > 1.5) { this.stuck = 0; this.events.push({ type: 'stuckReset' }); }
+    } else this.stuck = 0;
   }
   checkTriggers(dt) {
     // Lake

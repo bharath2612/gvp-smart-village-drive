@@ -248,6 +248,7 @@ async function boot() {
         if (ev.type === 'bump') { audio.bump(); carVisual.kick(0.4 + ev.strength * 0.6); rig.addShake(0.15 + ev.strength * 0.3); }
         if (ev.type === 'hedge') audio.rustle();
         if (ev.type === 'boost') audio.boostStart();
+        if (ev.type === 'stuckReset') { resetToRoad(); ui.toast('Unstuck: back on the road.', 2); }
         if (ev.type === 'lake' && !G.lakeSeq) { G.lakeSeq = { t: 0 }; audio.splash(); rig.addShake(0.6); $('splash').classList.add('show'); ui.toast('Splash! Fished out onto the joggers’ track.', 4); }
       }
       if (G.lakeSeq) { G.lakeSeq.t += dt; carVisual.root.position.y = -Math.min(1.5, G.lakeSeq.t * 2); if (G.lakeSeq.t > 0.9 && !G.lakeSeq.moved) { G.lakeSeq.moved = true; respawnOnTrack(); $('splash').classList.remove('show'); } if (G.lakeSeq.t > 1.4) { G.lakeSeq = null; car.frozen = false; carVisual.root.position.y = 0; } }

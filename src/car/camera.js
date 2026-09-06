@@ -41,8 +41,9 @@ export class CameraRig {
       targetLook.copy(carPos).addScaledVector(fwd, cfg.chase.lookAhead).add(new THREE.Vector3(0, 1.1, 0));
       targetFov = lerp(cfg.chase.fov, cfg.chase.fovFast, t) + (car.boosting ? 6 : 0);
     } else if (this.mode === 'hood') {
-      targetPos.copy(carPos).addScaledVector(fwd, -0.3).add(new THREE.Vector3(0, 1.62, 0));
-      targetLook.copy(carPos).addScaledVector(fwd, 40).add(new THREE.Vector3(0, 1.0, 0));
+      // Bumper-height first-person view just behind the front edge; the car body is hidden while this is active.
+      targetPos.copy(carPos).addScaledVector(fwd, car.halfL - 0.9).add(new THREE.Vector3(0, 1.35, 0));
+      targetLook.copy(carPos).addScaledVector(fwd, 40).add(new THREE.Vector3(0, 0.9, 0));
       targetFov = cfg.hood.fov;
     } else if (this.mode === 'drone') {
       targetPos.copy(carPos).add(new THREE.Vector3(0, cfg.drone.height, 0.01));

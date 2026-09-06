@@ -109,7 +109,8 @@ export function buildAmenities(ctx) {
   // Stadium: twelve stepped seat rows in two tiers, a walkway, back wall, cantilevered roof canopy,
   // four floodlight masts with lamp arrays, eight-lane track, marked pitch with goals, corner entrance gates.
   { const a = A.stadium; const p = plotOf('stadium'); const cx = a.x + a.w / 2, cz = a.y + a.h / 2;
-    const rx = a.w / 2 - 8, rz = a.h / 2 - 8;
+    // The bowl (track + 12 seat rows + walkway + back wall ~ 18 m) must stay inside the 200 x 210 m lot with a 6 m margin.
+    const rx = a.w / 2 - 24, rz = a.h / 2 - 24;
     track.push(patchGeo(a.x + 6, a.y + 6, a.w - 12, a.h - 12, 4, 0.04));
     const inner = new THREE.Mesh(new THREE.CircleGeometry(1, 48), stdMat(T, T.lawn)); inner.scale.set(rx - 11, rz - 11, 1); inner.rotation.x = -Math.PI / 2; inner.position.set(cx, 0.06, cz); inner.receiveShadow = true; scene.add(inner);
     const bandMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });

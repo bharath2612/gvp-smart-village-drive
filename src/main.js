@@ -303,6 +303,7 @@ async function boot() {
       }
       carVisual.update(dt, car, alpha, input, simTime);
       if (!G.flight) rig.update(dt, car, alpha, input);
+      carVisual.setBodyVisible(rig.mode !== 'hood');
       ctx.lighting.update(dt, car);
       carVisual.setNight(ctx.lighting.isNight);
       audio.setAmbience(ctx.lighting.ambience);

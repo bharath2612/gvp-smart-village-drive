@@ -71,7 +71,7 @@ export class CarVisual {
     scene.add(this.root);
   }
   // Swap the visible car: tear down chassis, wheels and lights, rebuild from another model.
-  setModel(model) { for (const c of [...this.root.children]) this.root.remove(c); this.build(model); this.setNight(this._night); }
+  setModel(model) { for (const c of [...this.root.children]) this.root.remove(c); this.build(model); this.setNight(this._night); const v = this._bodyVisible; this._bodyVisible = undefined; this.setBodyVisible(v !== false); }
   // A static copy of the current car (body + wheels, no lights) for leaving it parked.
   makeParkedCopy() {
     const g = new THREE.Group();
@@ -127,6 +127,8 @@ export class CarVisual {
     }
     this.halfLength = (bbox.max.z - bbox.min.z) / 2; this.halfWidth = (bbox.max.x - bbox.min.x) / 2;
   }
+  // Hide body and wheels (first-person view) but keep the lights working.
+  setBodyVisible(v) { if (this._bodyVisible === v) return; this._bodyVisible = v; this.root.traverse((o) => { if (o.isMesh) o.visible = v; }); }
   setNight(on) { this._night = on; this.spots.forEach((s) => { s.visible = on; s.intensity = on ? 180 : 0; }); this.headMat.emissiveIntensity = on ? 2.5 : 0.4; }
   update(dt, car, alpha, input, now) {
     const x = lerp(car.px, car.x, alpha), z = lerp(car.pz, car.z, alpha);

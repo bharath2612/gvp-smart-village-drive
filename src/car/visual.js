@@ -13,13 +13,16 @@ export async function loadCarModel() {
       const head = await fetch(url, { method: 'HEAD' }); if (!head.ok || /text\/html/.test(head.headers.get('content-type') || '')) continue;
       const gltf = await loadGLTF(url);
       const scene = gltf.scene; scene.updateMatrixWorld(true);
-      const wheelNodes = []; scene.traverse((n) => { if (/wheel/i.test(n.name) && n.parent && !/wheel/i.test(n.parent.name)) wheelNodes.push(n); });
-      const isWheel = (n) => { let p = n; while (p) { if (/wheel/i.test(p.name)) return true; p = p.parent; } return false; };
-      const body = bakeGeometry(scene, { filter: (n) => !isWheel(n) });
+      // Road wheels are the nodes named wheel-<front|back>-<left|right>. Anything else called "wheel"
+      // (Kenney's SUV carries a spare on the tailgate as "wheel-back") stays part of the static body.
+      const isRoadWheel = (name) => /wheel[-_ ]?(front|back|rear)[-_ ]?(left|right)/i.test(name);
+      const wheelNodes = []; scene.traverse((n) => { if (isRoadWheel(n.name)) wheelNodes.push(n); });
+      const underRoadWheel = (n) => { let p = n; while (p) { if (isRoadWheel(p.name)) return true; p = p.parent; } return false; };
+      const body = bakeGeometry(scene, { filter: (n) => !underRoadWheel(n) });
       let wheel = null, wheelPositions = [];
       if (wheelNodes.length >= 4) {
-        const w0 = wheelNodes[0]; const inv = new THREE.Matrix4().copy(w0.matrixWorld).invert();
-        const wb = bakeGeometry(w0, { filter: () => true }); wb.geo.applyMatrix4(inv); // wheel geometry at its own origin
+        const w0 = wheelNodes.find((n) => /left/i.test(n.name)) || wheelNodes[0]; const inv = new THREE.Matrix4().copy(w0.matrixWorld).invert();
+        const wb = bakeGeometry(w0, { filter: () => true }); wb.geo.applyMatrix4(inv); // wheel geometry at its own origin, axle along x
         wheel = wb.geo;
         wheelPositions = wheelNodes.map((n) => { const p = new THREE.Vector3(); n.getWorldPosition(p); return { name: n.name, p }; });
       }
@@ -27,7 +30,7 @@ export async function loadCarModel() {
       let flip = false;
       const front = wheelPositions.filter((w) => /front/i.test(w.name)), back = wheelPositions.filter((w) => /back|rear/i.test(w.name));
       if (front.length && back.length) flip = front[0].p.z > back[0].p.z;
-      if (flip) { body.geo.rotateY(Math.PI); wheelPositions.forEach((w) => { w.p.x = -w.p.x; w.p.z = -w.p.z; }); }
+      if (flip) { body.geo.rotateY(Math.PI); if (wheel) wheel.rotateY(Math.PI); wheelPositions.forEach((w) => { w.p.x = -w.p.x; w.p.z = -w.p.z; }); }
       // Scale to the configured length, ground at 0, centred on x/z.
       body.geo.computeBoundingBox(); const bb = body.geo.boundingBox; const size = new THREE.Vector3(); bb.getSize(size);
       const s = CONFIG.car.length / size.z;
@@ -35,7 +38,7 @@ export async function loadCarModel() {
       body.geo.translate(-cx, 0, -cz); body.geo.scale(s, s, s);
       if (wheel) { wheel.scale(s, s, s); wheelPositions.forEach((w) => { w.p.x = (w.p.x - cx) * s; w.p.y *= s; w.p.z = (w.p.z - cz) * s; }); }
       // Wheel radius from the wheel geometry; ground the body so wheels touch y = 0.
-      let wheelR = 0.38; if (wheel) { wheel.computeBoundingBox(); wheelR = (wheel.boundingBox.max.y - wheel.boundingBox.min.y) / 2; }
+      let wheelR = 0.38, wheelOut = 1; if (wheel) { wheel.computeBoundingBox(); const wb = wheel.boundingBox; wheelR = (wb.max.y - wb.min.y) / 2; wheelOut = Math.sign((wb.min.x + wb.max.x) / 2) || 1; }
       const groundY = wheelPositions.length ? Math.min(...wheelPositions.map((w) => w.p.y)) - wheelR : bb.min.y * s;
       body.geo.translate(0, -groundY, 0); wheelPositions.forEach((w) => { w.p.y -= groundY; });
       // Paint: repaint the palette texture cells matching the dominant body colour with the brand colour.
@@ -44,7 +47,7 @@ export async function loadCarModel() {
       else if (body.paletteMap) map = body.paletteMap;
       body.geo.computeBoundingBox();
       console.log('[car] model', url, 'wheels', wheelPositions.length, 'flip', flip);
-      return { body: body.geo, wheel, wheelPositions, wheelR, bbox: body.geo.boundingBox, map };
+      return { body: body.geo, wheel, wheelPositions, wheelR, wheelOut, bbox: body.geo.boundingBox, map, wheelMap: body.paletteMap };
     } catch (e) { console.warn('[car] failed', url, e); }
   }
   return null;
@@ -61,14 +64,14 @@ export class CarVisual {
       const paint = model.map ? new THREE.MeshStandardMaterial({ map: model.map, roughness: 0.4, metalness: 0.3 }) : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.35 });
       const bodyMesh = new THREE.Mesh(model.body, paint); bodyMesh.castShadow = true; bodyMesh.receiveShadow = true; this.chassis.add(bodyMesh);
       bbox = model.bbox;
-      const wheelMat = model.map ? new THREE.MeshStandardMaterial({ map: model.map, roughness: 0.8, metalness: 0.2 }) : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.2 });
+      const wheelMat = model.wheelMap ? new THREE.MeshStandardMaterial({ map: model.wheelMap, roughness: 0.8, metalness: 0.2 }) : new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.2 });
       const wp = model.wheelPositions.length >= 4 ? model.wheelPositions : [[-0.86, -1.45], [0.86, -1.45], [-0.86, 1.45], [0.86, 1.45]].map(([x, z], i) => ({ name: i < 2 ? 'front' : 'back', p: new THREE.Vector3(x, 0.38, z) }));
       for (const w of wp) {
         const pivot = new THREE.Group(); pivot.position.copy(w.p);
         const spin = new THREE.Group(); pivot.add(spin);
         const mesh = new THREE.Mesh(model.wheel || new THREE.CylinderGeometry(0.38, 0.38, 0.28, 18).rotateZ(Math.PI / 2), model.wheel ? wheelMat : new THREE.MeshStandardMaterial({ color: 0x15171a }));
-        // Kenney wheels are modelled for the left side; mirror right-side wheels.
-        if (model.wheel && w.p.x > 0) mesh.scale.x = -1;
+        // The baked wheel's hub offset points one way; mirror it for wheels on the other side of the car.
+        if (model.wheel && Math.sign(w.p.x) !== model.wheelOut) mesh.scale.x = -1;
         mesh.castShadow = true; spin.add(mesh);
         this.root.add(pivot); this.wheels.push({ pivot, spin, front: /front/i.test(w.name), r: model.wheelR });
       }

@@ -8,11 +8,45 @@ export class UI {
   constructor(settings, audio) {
     this.settings = settings; this.audio = audio;
     this.el = {
-      loading: $('loading'), loadBar: $('load-bar'), loadText: $('load-text'), title: $('title'), hud: $('hud'), speed: $('speed'), boost: $('boost-bar'), gear: $('gear'), hb: $('hb'),
+      loading: $('loading'), loadBar: $('load-bar'), loadText: $('load-text'), title: $('title'), hud: $('hud'), gauge: $('gauge'), gear: $('gear'), hb: $('hb'),
       compass: $('compass-heading'), zone: $('zone'), nearest: $('nearest'), tod: $('tod-btn'), mute: $('mute-btn'), timer: $('mission-timer'), toast: $('toast'), card: $('plot-card'),
       controls: $('controls-card'), pause: $('pause'), missions: $('missions'), settingsEl: $('settings'), teleport: $('teleport'), tpInput: $('tp-input'), tpList: $('tp-list'), map: $('bigmap'), debug: $('debug'), wrong: $('wrongway'), arrow: $('mission-arrow'), complete: $('complete'), resume: $('resume-count'), error: $('fatal'),
     };
     this.toastTimer = 0; this.cardPlot = null; this.cardTimer = 0;
+    this.needle = 0; this.gaugeDpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.el.gauge.width = 220 * this.gaugeDpr; this.el.gauge.height = 220 * this.gaugeDpr;
+  }
+  // Analogue speedometer: 270-degree sweep, 0 to 200 km/h, red zone from 140, gold needle, boost arc inside.
+  drawGauge(kmh, boost, boosting, dt) {
+    const c = this.el.gauge, g = c.getContext('2d'), d = this.gaugeDpr, S = 220, cx = S / 2, cy = S / 2 + 6, R = 92;
+    const MAX = 200, a0 = Math.PI * 0.75, sweep = Math.PI * 1.5;
+    const ang = (v) => a0 + sweep * Math.min(Math.max(v / MAX, 0), 1);
+    this.needle += (kmh - this.needle) * Math.min(1, dt * 10);
+    g.save(); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, S, S);
+    g.beginPath(); g.arc(cx, cy, R + 10, 0, Math.PI * 2); g.fillStyle = 'rgba(5,8,16,0.55)'; g.fill();
+    g.lineCap = 'round';
+    g.beginPath(); g.arc(cx, cy, R, a0, a0 + sweep); g.strokeStyle = 'rgba(255,255,255,0.14)'; g.lineWidth = 6; g.stroke();
+    g.beginPath(); g.arc(cx, cy, R, ang(140), a0 + sweep); g.strokeStyle = 'rgba(220,60,50,0.75)'; g.lineWidth = 6; g.stroke();
+    for (let v = 0; v <= MAX; v += 10) {
+      const a = ang(v), major = v % 20 === 0; const r1 = R - 9, r2 = major ? R - 22 : R - 15;
+      g.beginPath(); g.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
+      g.strokeStyle = v >= 140 ? 'rgba(255,120,110,0.9)' : 'rgba(245,245,245,0.85)'; g.lineWidth = major ? 2.2 : 1; g.stroke();
+      if (v % 40 === 0) { g.fillStyle = 'rgba(245,245,245,0.9)'; g.font = '600 12px Inter, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(v), cx + Math.cos(a) * (R - 34), cy + Math.sin(a) * (R - 34)); }
+    }
+    // Boost arc (inner).
+    g.beginPath(); g.arc(cx, cy, R - 46, a0, a0 + sweep); g.strokeStyle = 'rgba(255,255,255,0.1)'; g.lineWidth = 4; g.stroke();
+    g.beginPath(); g.arc(cx, cy, R - 46, a0, a0 + sweep * boost); g.strokeStyle = boosting ? '#ffffff' : '#c9a227'; g.lineWidth = 4; g.stroke();
+    // Digital readout.
+    g.fillStyle = '#f5f5f5'; g.font = '600 30px "Playfair Display", serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(Math.round(kmh)), cx, cy + 34);
+    g.fillStyle = 'rgba(245,245,245,0.6)'; g.font = '500 9px Inter, sans-serif'; g.fillText('K M / H', cx, cy + 54);
+    g.fillStyle = 'rgba(201,162,39,0.85)'; g.font = '500 9px Inter, sans-serif'; g.fillText('BOOST', cx, cy - 22);
+    // Needle.
+    const na = ang(this.needle);
+    g.shadowColor = 'rgba(201,162,39,0.6)'; g.shadowBlur = 8;
+    g.beginPath(); g.moveTo(cx + Math.cos(na + Math.PI) * 14, cy + Math.sin(na + Math.PI) * 14); g.lineTo(cx + Math.cos(na) * (R - 12), cy + Math.sin(na) * (R - 12));
+    g.strokeStyle = '#e0b62f'; g.lineWidth = 3; g.stroke(); g.shadowBlur = 0;
+    g.beginPath(); g.arc(cx, cy, 7, 0, Math.PI * 2); g.fillStyle = '#0a0f1c'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#c9a227'; g.stroke();
+    g.restore();
   }
   setLoading(p, text) { this.el.loadBar.style.width = `${Math.round(p * 100)}%`; if (text) this.el.loadText.textContent = text; }
   hideLoading() { this.el.loading.classList.add('hidden'); }
@@ -27,8 +61,7 @@ export class UI {
   update(dt, car, world, missions, lighting, camMode) {
     const e = this.el;
     const kmh = Math.abs(car.speed) * KMH;
-    e.speed.textContent = Math.round(kmh);
-    e.boost.style.width = `${Math.round(car.boostCharge * 100)}%`; e.boost.classList.toggle('active', car.boosting);
+    this.drawGauge(kmh, car.boostCharge, car.boosting, dt);
     e.gear.textContent = car.speed < -0.3 ? 'R' : 'D'; e.hb.classList.toggle('on', car.handbrakeOn);
     const deg = ((car.yaw * 180 / Math.PI) % 360 + 360) % 360;
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];

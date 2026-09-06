@@ -16,6 +16,9 @@ export class Input {
     window.addEventListener('mouseup', () => { this.mouse.down = false; });
     window.addEventListener('mousemove', (e) => { if (this.mouse.down) { this.mouse.dx += e.movementX; this.mouse.dy += e.movementY; } });
     canvas.addEventListener('wheel', (e) => { this.mouse.wheel += e.deltaY; e.preventDefault(); }, { passive: false });
+    // Trackpad pinch (ctrl+wheel) and Safari gestures must never zoom the page: it pushes the HUD off-screen.
+    window.addEventListener('wheel', (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+    for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault());
   }
   on(action, fn) { (this.actions[action] ||= []).push(fn); return this; }
   fire(action, e) { (this.actions[action] || []).forEach((fn) => fn(e)); }

@@ -4,17 +4,18 @@ import { instancedChunks } from './instancing.js';
 import { rng } from '../util/math.js';
 
 // Returns the [a,b] intervals along a road's long axis where other roads cross it (junctions).
-export function junctionIntervals(road, roads) {
+export function junctionIntervals(road, roads, margin = () => 1) {
   const out = [];
   for (const o of roads) {
     if (o === road) continue;
+    const m = margin(o);
     const ix0 = Math.max(road.x, o.x), ix1 = Math.min(road.x + road.w, o.x + o.w);
     const iz0 = Math.max(road.y, o.y), iz1 = Math.min(road.y + road.h, o.y + o.h);
     // Roads that merely touch (a 20 m road ending on the boundary road) still form a junction mouth.
     if (ix1 - ix0 < -0.5 || iz1 - iz0 < -0.5) continue;
     if (ix1 - ix0 <= 0.5 && iz1 - iz0 <= 0.5) continue; // corner touch only
     // Intervals are relative to the road's own start so they can be subtracted from [0, len].
-    out.push(road.horizontal ? [ix0 - road.x - 1, ix1 - road.x + 1] : [iz0 - road.y - 1, iz1 - road.y + 1]);
+    out.push(road.horizontal ? [ix0 - road.x - m, ix1 - road.x + m] : [iz0 - road.y - m, iz1 - road.y + m]);
   }
   return out;
 }
@@ -24,6 +25,10 @@ function subtract(len, intervals) {
   if (cur < len) segs.push([cur, len]);
   return segs.filter(([a, b]) => b - a > 0.5);
 }
+
+// Junction corners: the block corner is rounded with this kerb radius; the footpath / verge follows the arc.
+const CORNER_R = 6;
+const kerbOffset = (q) => (q.kind === '25m' || q.kind === 'spine' ? 3 : 2);
 
 export function buildRoads(ctx) {
   const { scene, world, T, colliders } = ctx;
@@ -42,34 +47,32 @@ export function buildRoads(ctx) {
     const len = r.horizontal ? r.w : r.h; const wid = r.horizontal ? r.h : r.w;
     const jx = junctionIntervals(r, roads);
     const segs = subtract(len, jx);
+    // Footpath / verge strips end exactly where the corner fillet (radius CORNER_R) begins: R minus the crossing road's kerb offset.
+    const stripSegs = subtract(len, junctionIntervals(r, roads, (o) => CORNER_R - kerbOffset(o)));
     const along = (t, off, y, gw, gl) => (r.horizontal ? patchGeo(r.x + t, r.y + off - gw / 2, gl, gw, 1, y) : patchGeo(r.x + off - gw / 2, r.y + t, gw, gl, 1, y));
     // 25 m roads and the spine get a 3 m planted verge along both edges (trees stand on grass, not asphalt);
     // residential streets get a 2 m cobbled footpath with bollard lights instead.
     const verge = (r.kind === '25m' || isSpine) ? 3 : 0;
     const path = residential ? 2 : 0;
+    // Verge (major roads) and footpath (residential) strips with their kerbs and bollards.
+    for (const [va, vb] of stripSegs) {
+      if (vb - va < 4) continue;
+      if (verge) {
+        verges.push(along(va, verge / 2, 0.075, verge, vb - va)); verges.push(along(va, wid - verge / 2, 0.075, verge, vb - va));
+        for (const side of [verge, wid - verge]) kerbs.push(r.horizontal ? box(vb - va, 0.12, 0.25, 0xb9b7b0, { x: r.x + va + (vb - va) / 2, z: r.y + side }) : box(0.25, 0.12, vb - va, 0xb9b7b0, { x: r.x + side, z: r.y + va + (vb - va) / 2 }));
+      }
+      if (path) {
+        footpaths.push(along(va, path / 2, 0.11, path, vb - va)); footpaths.push(along(va, wid - path / 2, 0.11, path, vb - va));
+        for (const side of [path, wid - path]) kerbs.push(r.horizontal ? box(vb - va, 0.14, 0.22, 0xc9c5bb, { x: r.x + va + (vb - va) / 2, z: r.y + side }) : box(0.22, 0.14, vb - va, 0xc9c5bb, { x: r.x + side, z: r.y + va + (vb - va) / 2 }));
+        for (let t = va + 4; t < vb - 2; t += 12) for (const side of [0.6, wid - 0.6]) { const x = r.horizontal ? r.x + t : r.x + side, z = r.horizontal ? r.y + side : r.y + t; bollardItems.push({ x, z }); ctx.lightPoints.push({ x, z, r: 4.5, kind: 'bollard' }); }
+      }
+    }
     // Edge lines and kerbs along non-junction segments.
     for (const [a, b] of segs) {
       if (!residential) for (const side of [verge + 0.5, wid - verge - 0.5]) marks.push(along(a, side, 0.09, 0.15, b - a));
       for (const side of [-0.15, wid + 0.15]) {
         const kg = r.horizontal ? box(b - a, 0.15, 0.3, 0xb9b7b0, { x: r.x + a + (b - a) / 2, z: r.y + side }) : box(0.3, 0.15, b - a, 0xb9b7b0, { x: r.x + side, z: r.y + a + (b - a) / 2 });
         kerbs.push(kg);
-      }
-      if (verge) {
-        const va = a === 0 ? 0 : a + 4, vb = b === len ? len : b - 4;
-        if (vb - va >= 6) {
-        verges.push(along(va, verge / 2, 0.075, verge, vb - va)); verges.push(along(va, wid - verge / 2, 0.075, verge, vb - va));
-        for (const side of [verge, wid - verge]) kerbs.push(r.horizontal ? box(vb - va, 0.12, 0.25, 0xb9b7b0, { x: r.x + va + (vb - va) / 2, z: r.y + side }) : box(0.25, 0.12, vb - va, 0xb9b7b0, { x: r.x + side, z: r.y + va + (vb - va) / 2 }));
-        for (const end of [a === 0 ? null : va, b === len ? null : vb]) if (end !== null) for (const side of [verge / 2, wid - verge / 2]) kerbs.push(r.horizontal ? box(0.25, 0.12, verge, 0xb9b7b0, { x: r.x + end, z: r.y + side }) : box(verge, 0.12, 0.25, 0xb9b7b0, { x: r.x + side, z: r.y + end }));
-        }
-      }
-      if (path) {
-        const va = a === 0 ? 0 : a + 1, vb = b === len ? len : b - 1;
-        if (vb - va >= 6) {
-          footpaths.push(along(va, path / 2, 0.11, path, vb - va)); footpaths.push(along(va, wid - path / 2, 0.11, path, vb - va));
-          for (const side of [path, wid - path]) kerbs.push(r.horizontal ? box(vb - va, 0.14, 0.22, 0xc9c5bb, { x: r.x + va + (vb - va) / 2, z: r.y + side }) : box(0.22, 0.14, vb - va, 0xc9c5bb, { x: r.x + side, z: r.y + va + (vb - va) / 2 }));
-          // Bollard lights every 12 m on both footpaths.
-          for (let t = va + 4; t < vb - 2; t += 12) for (const side of [0.6, wid - 0.6]) { const x = r.horizontal ? r.x + t : r.x + side, z = r.horizontal ? r.y + side : r.y + t; bollardItems.push({ x, z }); ctx.lightPoints.push({ x, z, r: 4.5, kind: 'bollard' }); }
-        }
       }
       // Centre dashes on 15 m and wider (not the spine: it has a median).
       if (!isSpine && (r.kind === '15m' || r.kind === '20m' || r.kind === '25m')) {
@@ -107,31 +110,36 @@ export function buildRoads(ctx) {
       }
     }
   }
-  // Corner bulbs: a quarter-disc of cobbles with a curved kerb at every junction corner of a residential street,
-  // so the footpaths of the two streets wrap round the corner instead of stopping short.
+  // Junction corners. In local corner coordinates (u along x, v along z, both pointing INTO the junction) the
+  // horizontal road's kerb line is v = oA and the vertical road's kerb line is u = oB. The block corner is rounded
+  // with an arc of radius R tangent to both kerb lines, centred at (oB - R, oA - R) inside the block, so the
+  // footpath sweeps round the corner and the carriageway gains the fillet. Strips end where the arc starts.
   {
-    const R = 4.2;
-    const arc = (sx, sz) => (sz > 0 ? (sx > 0 ? -Math.PI / 2 : Math.PI) : (sx > 0 ? 0 : Math.PI / 2));
+    const R = CORNER_R;
+    const arcStart = (sx, sz) => (sz > 0 ? (sx > 0 ? -Math.PI / 2 : Math.PI) : (sx > 0 ? 0 : Math.PI / 2));
     const seen = new Set();
     for (const r of roads) {
-      if (r.kind === 'spine' || r.kind === '25m') continue;
+      if (!(r.kind === '10m' || r.kind === '15m' || r.kind === '20m')) continue;
       for (const o of roads) {
         if (o === r || o.horizontal === r.horizontal) continue;
         const hz = r.horizontal ? r : o, vt = r.horizontal ? o : r;
         const ix0 = Math.max(hz.x, vt.x), ix1 = Math.min(hz.x + hz.w, vt.x + vt.w), iz0 = Math.max(hz.y, vt.y), iz1 = Math.min(hz.y + hz.h, vt.y + vt.h);
         if (ix1 - ix0 < -0.5 || iz1 - iz0 < -0.5) continue;
         if (ix1 - ix0 <= 0.5 && iz1 - iz0 <= 0.5) continue;
-        // Corners of the junction rectangle; the bulb bulges into the junction (towards its centre).
-        const cx = (ix0 + ix1) / 2, cz = (iz0 + iz1) / 2;
+        const oA = kerbOffset(hz), oB = kerbOffset(vt);
+        const vcx = vt.x + vt.w / 2, hcz = hz.y + hz.h / 2;
         for (const [px, pz] of [[ix0, iz0], [ix1, iz0], [ix0, iz1], [ix1, iz1]]) {
-          // Skip corners that lie inside a 25 m road / spine carriageway (the major road dominates there).
-          if (roads.some((m) => (m.kind === '25m' || m.kind === 'spine') && px > m.x + 3 && px < m.x + m.w - 3 && pz > m.y + 3 && pz < m.y + m.h - 3)) continue;
           const key = `${px.toFixed(1)},${pz.toFixed(1)}`; if (seen.has(key)) continue; seen.add(key);
-          const sx = Math.sign(cx - px) || 1, sz = Math.sign(cz - pz) || 1;
-          const disc = new THREE.CircleGeometry(R, 14, arc(sx, sz), Math.PI / 2); disc.rotateX(-Math.PI / 2); disc.translate(px, 0.115, pz);
-          const uv = disc.attributes.uv, pos = disc.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / 1, pos.getZ(i) / 1);
-          footpaths.push(disc);
-          const kerb = new THREE.TorusGeometry(R, 0.11, 5, 14, Math.PI / 2); kerb.rotateZ(arc(sx, sz)); kerb.rotateX(-Math.PI / 2); kerb.translate(px, 0.1, pz);
+          const sx = px < vcx ? 1 : -1, sz = pz < hcz ? 1 : -1;
+          const cu = oB - R, cv = oA - R;
+          const pts = [];
+          for (let i = 0; i <= 14; i++) { const t = (i / 14) * Math.PI / 2; pts.push([cu + R * Math.cos(t), cv + R * Math.sin(t)]); }
+          pts.push([cu, 0], [0, 0], [0, cv]);
+          const shape = new THREE.Shape(pts.map(([u, v]) => new THREE.Vector2(sx * u, -sz * v)));
+          const g = new THREE.ShapeGeometry(shape); g.rotateX(-Math.PI / 2); g.translate(px, 0.115, pz);
+          const uv = g.attributes.uv, pos = g.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i), pos.getZ(i));
+          (hz.kind === '25m' || hz.kind === 'spine' || vt.kind === '25m' || vt.kind === 'spine' ? footpaths : footpaths).push(g);
+          const kerb = new THREE.TorusGeometry(R, 0.11, 5, 16, Math.PI / 2); kerb.rotateZ(arcStart(sx, sz)); kerb.rotateX(-Math.PI / 2); kerb.translate(px + sx * cu, 0.1, pz + sz * cv);
           const col = new Float32Array(kerb.attributes.position.count * 3).fill(0.79); kerb.setAttribute('color', new THREE.BufferAttribute(col, 3)); kerbs.push(kerb);
         }
       }

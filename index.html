@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Smart Village Drive · GVP Smart Village</title>
   <meta name="description" content="Drive through the full 3 km x 3 km GVP Smart Village master plan at real scale: 564 farm plots, 560 premium villas, 504 town houses, commercial spine, lake and amenities." />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230a0f1c'/%3E%3Ctext x='32' y='44' font-size='36' text-anchor='middle' fill='%23c9a227' font-family='Georgia'%3ESV%3C/text%3E%3C/svg%3E" />
@@ -27,7 +27,7 @@
     <div id="mission-arrow"><svg viewBox="0 0 40 40"><path d="M20 3 L34 30 L20 23 L6 30 Z" fill="#c9a227" stroke="#0a0f1c" stroke-width="1.5"/></svg></div>
     <div id="mission-dist"></div>
     <div id="wrongway">WRONG WAY</div>
-    <div id="speedo" class="panel"><div id="speed">0</div><div class="unit">KM/H</div><div id="boost"><div id="boost-bar"></div></div><div class="row"><span id="gear">D</span><span id="hb">HANDBRAKE</span><span id="cam-mode">chase</span></div></div>
+    <div id="speedo" class="panel"><canvas id="gauge" width="220" height="220"></canvas><div class="row"><span id="gear">D</span><span id="hb">HANDBRAKE</span><span id="cam-mode">chase</span></div></div>
     <canvas id="minimap" class="panel" width="220" height="220"></canvas>
     <div id="toast" class="panel"></div>
     <div id="plot-card" class="panel"></div>

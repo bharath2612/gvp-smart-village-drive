@@ -154,8 +154,9 @@ export function buildAmenities(ctx) {
       solid(x - 1, z - 1, x + 1, z + 1, 'amenity', p);
     }
     // Corner entrance gates with stairs.
+    // Entrance gates sit in the four corners of the 200 x 210 m lot (outside the stand ellipse, inside the boundary).
     for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-      const x = cx + sx * (rx + r + 6), z = cz + sz * (rz + r + 4) * 0.72;
+      const x = cx + sx * (a.w / 2 - 9), z = cz + sz * (a.h / 2 - 9);
       plaster.push(box(10, 7, 6, 0xf1eee8, { x, z, y: 3.5 })); dark.push(box(4, 4, 0.4, 0x3a4048, { x, z: z + sz * 3.1, y: 2 })); plaster.push(box(10.6, 0.5, 6.6, 0xc9a227, { x, z, y: 7.2 }));
       for (let s = 0; s < 4; s++) plaster.push(box(6, 0.25, 1, 0xd9d5cc, { x, z: z + sz * (3.6 + s), y: 0.125 + (3 - s) * 0.25 }));
       solid(x - 5, z - 3, x + 5, z + 3, 'amenity', p);

@@ -108,10 +108,10 @@ h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; font-weight: 600; 
 #swap-prompt.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 #swap-prompt .btn { margin: 0; }
 
-#mm-zoom { position: absolute; left: 226px; bottom: 150px; display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
-#mm-zoom button { width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); background: var(--panel); color: var(--text); font: 600 18px Inter, sans-serif; cursor: pointer; line-height: 1; backdrop-filter: blur(8px); }
+#mm-zoom { position: absolute; left: 96px; bottom: 30px; display: flex; flex-direction: row; gap: 8px; pointer-events: auto; }
+#mm-zoom button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.25); background: rgba(10,15,28,0.8); color: var(--text); font: 600 17px Inter, sans-serif; cursor: pointer; line-height: 1; padding: 0; }
 #mm-zoom button:hover { background: rgba(201,162,39,0.35); }
 #bigmap canvas { cursor: crosshair; }
 #fly-bar { display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 18px; margin-top: 10px; font-size: 14px; }
 #fly-bar .btn { margin: 0; }
-@media (max-width: 900px) { #mm-zoom { left: 166px; bottom: 110px; } }
+@media (max-width: 900px) { #mm-zoom { left: 66px; bottom: 26px; } }

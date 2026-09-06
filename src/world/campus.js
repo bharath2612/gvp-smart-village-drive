@@ -15,7 +15,7 @@ function band(cx, cz, rx0, rz0, rx1, rz1, y0, y1, color, a0, a1, seg = 24) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
   g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array((seg + 1) * 4), 2)); return g;
 }
-function textBoard(w, h, lines, bg = '#101418', fg = '#ffd35a', font = 'bold 64px Inter, sans-serif') {
+export function textBoard(w, h, lines, bg = '#101418', fg = '#ffd35a', font = 'bold 64px Inter, sans-serif') {
   const c = document.createElement('canvas'); c.width = 1024; c.height = Math.round(1024 * h / w); const g = c.getContext('2d');
   g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height); g.fillStyle = fg; g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle';
   // Shrink the font until the longest line fits inside 92 % of the board.
@@ -31,7 +31,7 @@ export function buildStadium(ctx) {
   const { scene, world, T, colliders } = ctx;
   const a = world.amenities.find((q) => q.id === 'stadium'); const p = world.byId.get('stadium');
   const cx = a.x + a.w / 2, cz = a.y + a.h / 2;
-  const solid = (x0, z0, x1, z1) => colliders.add(x0, z0, x1, z1, 'amenity', p);
+  const solid = (x0, z0, x1, z1, top) => colliders.add(x0, z0, x1, z1, 'amenity', p, top);
   const stone = [], metal = [], dark = [], paving = [], lawnPaths = [], glow = [], white = [];
   const bandMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
   const addBand = (r0, r1, y0, y1, colr, a0, a1, seg) => { const m = new THREE.Mesh(band(cx, cz, RX + r0, RZ + r0, RX + r1, RZ + r1, y0, y1, colr, a0, a1, seg), bandMat); m.castShadow = true; m.receiveShadow = true; scene.add(m); };
@@ -87,7 +87,7 @@ export function buildStadium(ctx) {
     }
     // Colliders: a few AABBs along the sector, spanning the stands' radial range.
     const parts = Math.max(3, Math.round((s1 - s0) / 0.2));
-    for (let i = 0; i < parts; i++) { const a0 = s0 + ((s1 - s0) * i) / parts, a1 = s0 + ((s1 - s0) * (i + 1)) / parts; const xs = [], zs = []; for (const ang of [a0, (a0 + a1) / 2, a1]) for (const rr of [4, 24]) { xs.push(cx + Math.cos(ang) * (RX + rr)); zs.push(cz + Math.sin(ang) * (RZ + rr)); } solid(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)); }
+    for (let i = 0; i < parts; i++) { const a0 = s0 + ((s1 - s0) * i) / parts, a1 = s0 + ((s1 - s0) * (i + 1)) / parts; const xs = [], zs = []; for (const ang of [a0, (a0 + a1) / 2, a1]) for (const rr of [4, 24]) { xs.push(cx + Math.cos(ang) * (RX + rr)); zs.push(cz + Math.sin(ang) * (RZ + rr)); } solid(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), tierTop + 6); }
   });
   // Roof canopy over every stand sector (not the pavilion), columns every 12 degrees.
   const roofY = tierTop + 3.4;
@@ -147,7 +147,7 @@ export function buildStadium(ctx) {
     const yaw = Math.atan2(cx - x, cz - z); const frame = box(8, 4.6, 0.5, 0x3a4048, { y: 44.5 }); frame.rotateY(yaw); frame.translate(x, 0, z); dark.push(frame);
     const lamps = new THREE.Group(); lamps.position.set(x, 44.5, z); lamps.rotation.y = yaw; const lampGeo = new THREE.BoxGeometry(1.4, 0.85, 0.25);
     for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) { const m = new THREE.Mesh(lampGeo, ctx.lampHeadMat); m.position.set(-3.2 + c * 1.6, -1.6 + r * 1.05, 0.38); lamps.add(m); }
-    scene.add(lamps); solid(x - 1.2, z - 1.2, x + 1.2, z + 1.2);
+    scene.add(lamps); solid(x - 4.5, z - 4.5, x + 4.5, z + 4.5, 47);
   }
   // Perimeter fence with gates at the four sides (E gate is the vehicle entrance from the 25 m road).
   { const gw = 12; const seg = (x0, z0, x1, z1) => { const hz = Math.abs(x1 - x0) > Math.abs(z1 - z0); metal.push(hz ? box(Math.abs(x1 - x0), 2.2, 0.15, 0x3a4048, { x: (x0 + x1) / 2, z: z0, y: 1.1 }) : box(0.15, 2.2, Math.abs(z1 - z0), 0x3a4048, { x: x0, z: (z0 + z1) / 2, y: 1.1 })); solid(Math.min(x0, x1) - 0.2, Math.min(z0, z1) - 0.2, Math.max(x0, x1) + 0.2, Math.max(z0, z1) + 0.2); };
@@ -175,7 +175,7 @@ export function buildStadium(ctx) {
 export function buildSchool(ctx) {
   const { scene, world, T, colliders } = ctx;
   const a = world.amenities.find((q) => q.id === 'school'); const p = world.byId.get('school');
-  const solid = (x0, z0, x1, z1) => colliders.add(x0, z0, x1, z1, 'amenity', p);
+  const solid = (x0, z0, x1, z1, top) => colliders.add(x0, z0, x1, z1, 'amenity', p, top);
   const plaster = [], stone = [], dark = [], metal = [], paving = [], glass = [], glow = [], white = [];
   const cx = a.x + a.w / 2, cz = a.y + a.h / 2;
   // Campus wall with pillars; main gate on the west side facing the spine, with a driveway from the spine edge.

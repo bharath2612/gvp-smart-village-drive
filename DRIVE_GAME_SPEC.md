@@ -326,6 +326,14 @@ Gamepad and touch input, phone support, selectable cars, damage model, day/night
 
 ---
 
+## 19. Charter plane (added 6 September 2026)
+
+- **Aircraft**: Cessna 172 style trainer, procedural (`src/plane/visual.js`): bevelled smooth-shaded fuselage, high wing with struts, hinged ailerons/flaps/elevator/rudder, tricycle gear, prop that blurs to a disc, nav/beacon/strobe lights, landing light at night, "VT-GVP" registration, live cockpit panel (canvas texture, 20 Hz).
+- **Flight model** (`src/plane/plane.js`, 120 Hz): lift/drag/thrust/gravity on the velocity vector, CL(alpha) with stall at 15 deg (+2 with flaps 30), commanded body rates with weathercock and dihedral stability, assists (auto-level, coordinated turns, altitude hold above 55 % power, alpha protection, 55 deg bank cap on Full). Ground model with nosewheel steering, brakes and rotation from 24 m/s. Touchdown rules: > 4.5 m/s sink, > 20 deg bank, pitch outside -8..15 deg or the lake = crash; otherwise a rated landing (Greaser / Firm / Hard). Obstacles use collider `top` heights (`src/world/spatial.js`). Soft boundary 2 km beyond the wall (10 s countdown, then an autopilot turns back), thrust fades between 800 and 950 m.
+- **Airstrip** (`src/world/airstrip.js`): runway 09/27 (600 x 23 m, 180 m south of the wall), taxiway, apron, hangar with a second aircraft, office, bowser, windsock, PAPI, edge and threshold lights, fence, car park, approach road from the main gate, whose leaves now stand open. The outer plain and hills (`src/world/horizon.js`) fill the view from the air; fog opens with altitude and small props are culled by distance.
+- **Switching** (`src/game/vehicles.js`): Settings → Vehicle, or F at the hangar / on the apron. Switching back while airborne drops the car on the nearest road below. Crash = smoke, fade, respawn on the runway. Sky tour mission (9 rings at altitude), map "Set waypoint" with a beam and the HUD arrow.
+- **Controls**: W/S throttle lever, Shift full power, ↓/↑ pull/push (pilot convention, flip in Settings), ←/→ bank, A/D rudder and nosewheel, Space brakes, V flaps, C chase/cockpit/fly-by/drone, R runway respawn, F board/park.
+
 # Appendix A - Engineering execution review (principal engineer / game architect view)
 
 The spec is sound. Below is how a studio would actually execute it so the driving feels good on day one and the world scales to 3 km without a rewrite, plus the traps this kind of project falls into.

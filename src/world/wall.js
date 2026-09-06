@@ -32,7 +32,7 @@ export function buildWall(ctx) {
   scene.add(instancedChunks(pil, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), items, { name: 'pilasters', castShadow: true }));
 
   // Colliders: 2 m deep outward so a boosted car can never tunnel.
-  colliders.add(-2, -2, S + 2, 0, 'wall'); colliders.add(-2, S, S + 2, S + 2, 'wall');
+  colliders.add(-2, -2, S + 2, 0, 'wall'); colliders.add(-2, S, gx - gateW / 2, S + 2, 'wall'); colliders.add(gx + gateW / 2, S, S + 2, S + 2, 'wall');
   colliders.add(-2, -2, 0, S + 2, 'wall'); colliders.add(S, -2, S + 2, S + 2, 'wall');
 
   // Gate house: two pillars, a lintel with the village name, closed steel gate leaves.
@@ -43,15 +43,13 @@ export function buildWall(ctx) {
   for (const sx of [-1, 1]) gate.push(box(3.4, 0.4, 3.4, 0xc9a227, { x: gx + sx * (gateW / 2 + 1.5), y: 9.1, z: S }));
   const gateMesh = new THREE.Mesh(merge(gate), stdMat(T, T.plaster, { vertexColors: true }));
   gateMesh.castShadow = true; gateMesh.receiveShadow = true; scene.add(gateMesh);
-  const leaves = new THREE.Mesh(merge([
-    box(gateW / 2 - 0.3, 5.5, 0.15, 0x2c3238, { x: gx - gateW / 4, y: 3, z: S }),
-    box(gateW / 2 - 0.3, 5.5, 0.15, 0x2c3238, { x: gx + gateW / 4, y: 3, z: S }),
-    ...Array.from({ length: 12 }, (_, i) => box(0.12, 5.9, 0.3, 0x14181c, { x: gx - gateW / 2 + 0.6 + i * (gateW - 1.2) / 11, y: 3.1, z: S })),
-  ]), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.7 }));
+  // Gate leaves stand open (swung outwards along the pillars) so the road runs on to the airstrip.
+  const leaf = (sx) => { const L = gateW / 2 - 0.3; const parts = [box(L, 5.5, 0.15, 0x2c3238, { x: L / 2, y: 3, z: 0 }), ...Array.from({ length: 6 }, (_, i) => box(0.12, 5.9, 0.3, 0x14181c, { x: 0.4 + i * (L - 0.8) / 5, y: 3.1, z: 0 }))]; const g = merge(parts); g.rotateY(sx * Math.PI / 2 * 0.92); g.translate(gx + sx * (gateW / 2 - 0.2), 0, S); return g; };
+  const leaves = new THREE.Mesh(merge([leaf(-1), leaf(1)]), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.7 }));
   leaves.castShadow = true; scene.add(leaves);
   colliders.add(gx - gateW / 2 - 3.2, S - 1.6, gx - gateW / 2, S + 2, 'gate');
   colliders.add(gx + gateW / 2, S - 1.6, gx + gateW / 2 + 3.2, S + 2, 'gate');
-  colliders.add(gx - gateW / 2, S - 0.3, gx + gateW / 2, S + 2, 'gate');
+  colliders.add(gx - gateW / 2 - 0.4, S + 0.2, gx - gateW / 2 + 0.2, S + gateW / 2, 'gate', null, 6); colliders.add(gx + gateW / 2 - 0.2, S + 0.2, gx + gateW / 2 + 0.4, S + gateW / 2, 'gate', null, 6);
   // Name board (canvas text) facing into the village.
   const c = document.createElement('canvas'); c.width = 1024; c.height = 128; const g = c.getContext('2d');
   g.fillStyle = '#0a0f1c'; g.fillRect(0, 0, 1024, 128); g.fillStyle = '#c9a227'; g.font = 'bold 72px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';

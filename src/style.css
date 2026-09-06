@@ -119,3 +119,18 @@ h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; font-weight: 600; 
 #boat-prompt { position: absolute; bottom: 116px; left: 50%; transform: translate(-50%, 20px); display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 18px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; border-color: rgba(201,162,39,0.5); }
 #boat-prompt.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 #boat-prompt .btn { margin: 0; }
+
+#fly-prompt { position: absolute; bottom: 116px; left: 50%; transform: translate(-50%, 20px); display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 18px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; border-color: rgba(201,162,39,0.5); }
+#fly-prompt.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+#fly-prompt .btn { margin: 0; }
+#alt-readout { font-size: 11px; color: var(--gold); margin-top: 3px; letter-spacing: 0.04em; min-height: 0; }
+#alt-readout:empty { display: none; }
+#flight-banner { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); font: 600 20px 'Playfair Display', serif; letter-spacing: 0.15em; opacity: 0; transition: opacity 0.2s; white-space: nowrap; text-shadow: 0 2px 12px rgba(0,0,0,0.8); }
+#flight-banner.show { opacity: 1; }
+#flight-banner.warn { color: #ff6b6b; animation: blink 0.8s infinite; }
+#flight-banner.info { color: #ffd35a; }
+#controls-card-plane { position: absolute; left: 50%; bottom: 40px; transform: translate(-50%, 30px); padding: 16px 22px; display: grid; grid-template-columns: auto auto; gap: 4px 18px; font-size: 13px; opacity: 0; transition: opacity 0.4s, transform 0.4s; }
+#controls-card-plane.show { opacity: 1; transform: translate(-50%, 0); }
+#controls-card-plane b { color: var(--gold); font-weight: 600; }
+#blackout { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 16; transition: opacity 0.6s; }
+#blackout.show { opacity: 1; }

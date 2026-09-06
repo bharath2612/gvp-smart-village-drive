@@ -57,8 +57,9 @@ export function buildLights(ctx) {
     }
   }
   const postMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.4 });
-  scene.add(instancedChunks(gb, postMat, gardenPosts, { name: 'garden-lights', chunk: 300 }));
-  scene.add(instancedChunks(gbCap, ctx.lampHeadMat || postMat, gardenPosts, { name: 'garden-light-caps', chunk: 300 }));
+  const cull = (root, dist) => { scene.add(root); (ctx.cullGroups = ctx.cullGroups || []).push({ root, dist }); };
+  cull(instancedChunks(gb, postMat, gardenPosts, { name: 'garden-lights', chunk: 300 }), 650);
+  cull(instancedChunks(gbCap, ctx.lampHeadMat || postMat, gardenPosts, { name: 'garden-light-caps', chunk: 300 }), 650);
   scene.add(instancedChunks(disc, gardenMat, gardenPools, { name: 'light-pools-garden', chunk: 400 }));
   scene.add(instancedChunks(disc, facadeMat, facadePools, { name: "light-pools-facade", chunk: 400 }));
 
@@ -67,8 +68,8 @@ export function buildLights(ctx) {
   for (const pk of world.parks) for (let x = pk.x + 8; x < pk.x + pk.w - 4; x += 16) { parkPosts.push({ x, z: pk.y + pk.h / 2 - 3 }); parkPosts.push({ x: x + 8, z: pk.y + pk.h / 2 + 3 }); }
   const temple = world.amenities.find((a) => a.id === 'temple');
   if (temple) { const cx = temple.x + temple.w / 2, cz = temple.y + temple.h / 2; for (let t = -90; t <= 90; t += 12) { if (Math.abs(t) < 40) continue; parkPosts.push({ x: cx + t, z: cz - 5.5 }); parkPosts.push({ x: cx + t, z: cz + 5.5 }); parkPosts.push({ x: cx - 5.5, z: cz + t }); parkPosts.push({ x: cx + 5.5, z: cz + t }); } }
-  scene.add(instancedChunks(gb, postMat, parkPosts, { name: 'park-lights', chunk: 400 }));
-  scene.add(instancedChunks(gbCap, ctx.lampHeadMat || postMat, parkPosts, { name: 'park-light-caps', chunk: 400 }));
+  cull(instancedChunks(gb, postMat, parkPosts, { name: 'park-lights', chunk: 400 }), 800);
+  cull(instancedChunks(gbCap, ctx.lampHeadMat || postMat, parkPosts, { name: 'park-light-caps', chunk: 400 }), 800);
   scene.add(instancedChunks(disc, streetMat, parkPosts.map((p) => ({ ...p, sx: 5, sy: 1, sz: 5 })), { name: 'light-pools-park', chunk: 400 }));
 
   // Stadium concourse and school campus bollards.
@@ -77,8 +78,8 @@ export function buildLights(ctx) {
   if (st) { const cx = st.x + st.w / 2, cz = st.y + st.h / 2; for (let i = 0; i < 28; i++) { const ang = (i / 28) * Math.PI * 2; camp.push({ x: cx + Math.cos(ang) * 92, z: cz + Math.sin(ang) * 97 }); } for (let x = cx + 88; x < st.x + st.w - 2; x += 8) { camp.push({ x, z: cz - 7 }); camp.push({ x, z: cz + 7 }); } }
   const sch = world.amenities.find((a) => a.id === 'school');
   if (sch && ctx.schoolInfo) { const si = ctx.schoolInfo; for (let x = 1520; x < sch.x + 42; x += 8) { camp.push({ x, z: si.cz - 5.5 }); camp.push({ x, z: si.cz + 5.5 }); } for (let x = si.plazaX + 4; x < si.plazaX + si.plazaW; x += 10) { camp.push({ x, z: si.cz - si.plazaD / 2 + 1 }); camp.push({ x, z: si.cz + si.plazaD / 2 - 1 }); } }
-  scene.add(instancedChunks(gb, postMat, camp, { name: 'campus-lights', chunk: 400 }));
-  scene.add(instancedChunks(gbCap, ctx.lampHeadMat || postMat, camp, { name: 'campus-light-caps', chunk: 400 }));
+  cull(instancedChunks(gb, postMat, camp, { name: 'campus-lights', chunk: 400 }), 800);
+  cull(instancedChunks(gbCap, ctx.lampHeadMat || postMat, camp, { name: 'campus-light-caps', chunk: 400 }), 800);
   scene.add(instancedChunks(disc, streetMat, camp.map((q) => ({ ...q, sx: 6, sy: 1, sz: 6 })), { name: 'light-pools-campus', chunk: 400 }));
   if (sch && ctx.schoolInfo) { const si = ctx.schoolInfo; scene.add(instancedChunks(disc, facadeMat, [{ x: si.plazaX + si.plazaW / 2, z: si.cz, sx: 70, sy: 1, sz: 70 }, { x: si.plazaX + si.plazaW / 2, z: si.cz - si.plazaD / 2 - 6, sx: 90, sy: 1, sz: 18 }], { name: 'light-pools-school', chunk: 1000 })); }
   // Stadium floodlight pools over the pitch and stands.
@@ -122,5 +123,7 @@ export function buildLights(ctx) {
   const gate = [{ x: 1500, z: 2985, sx: 40, sy: 1, sz: 24 }];
   if (temple) gate.push({ x: temple.x + temple.w / 2, z: temple.y + temple.h / 2, sx: 80, sy: 1, sz: 80 });
   scene.add(instancedChunks(disc, streetMat, gate, { name: 'light-pools-landmarks', chunk: 1000 }));
+  // Airstrip: runway edge, apron masts, hangar interior.
+  if (ctx.airstrip) scene.add(instancedChunks(disc, streetMat, ctx.airstrip.pools.map((q) => ({ x: q.x, z: q.z, sx: q.sx, sy: 1, sz: q.sz })), { name: 'light-pools-airstrip', chunk: 1000 }));
   ctx.lightCounts = { street: street.length, garden: gardenPosts.length, park: parkPosts.length };
 }

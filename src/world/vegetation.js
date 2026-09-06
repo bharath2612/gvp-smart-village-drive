@@ -33,7 +33,7 @@ export function buildVegetation(ctx) {
     const s = scale || 0.85 + r() * 0.35;
     const t = sp.tint[0] + r() * (sp.tint[1] - sp.tint[0]);
     items[species].push({ x, z, rot: r() * Math.PI * 2, sx: s, sy: s * (0.95 + r() * 0.1), sz: s, color: new THREE.Color(t, t, t) });
-    if (solid) colliders.add(x - 0.5, z - 0.5, x + 0.5, z + 0.5, 'tree');
+    if (solid) colliders.add(x - 0.5, z - 0.5, x + 0.5, z + 0.5, 'tree', null, sp.height * s);
   };
   const pick = (set) => set[Math.floor(r() * set.length)];
 
@@ -125,6 +125,7 @@ export function buildVegetation(ctx) {
     onInstance: (mesh, i, it) => { const k = `${Math.floor(it.x / CELL)},${Math.floor(it.z / CELL)}`; (cropCell.get(k) || cropCell.set(k, []).get(k)).push({ mesh, i, x: it.x, z: it.z, s: it.sx, t: -1 }); },
   });
   scene.add(shrubRoot);
+  (ctx.cullGroups = ctx.cullGroups || []).push({ root: shrubRoot, dist: 900 });
   ctx.shrubCount = shrubs.length;
   const flattened = [];
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
@@ -143,7 +144,13 @@ export function buildVegetation(ctx) {
 
 // Per-frame LOD: chunks nearer than lodDistance show the model, farther ones the stand-in.
 export function updateLOD(ctx, camPos) {
-  const d = ctx.lodDistance; const d2 = d * d;
+  // From the air the detailed tree models swap to stand-ins sooner, and small props are culled by distance.
+  const alt = Math.max(0, camPos.y - 30);
+  const d = Math.max(200, ctx.lodDistance - alt * 0.8); const d2 = d * d;
+  for (const { root, dist } of ctx.cullGroups || []) {
+    const dd = dist * dist; const ch = root.children;
+    for (let i = 0; i < ch.length; i++) { const c = ch[i].boundingSphere || ch[i].computeBoundingSphere() || ch[i].boundingSphere; const dx = c.center.x - camPos.x, dz = c.center.z - camPos.z, dy = camPos.y; ch[i].visible = dx * dx + dz * dz + dy * dy < dd + c.radius * c.radius; }
+  }
   for (const { hi, lo } of ctx.lod || []) {
     const hc = hi.children, lc = lo.children;
     for (let i = 0; i < hc.length; i++) {

@@ -24,7 +24,7 @@ export function buildLighting(ctx) {
 
   // Sky dome shader: vertical gradient + sun glow + stars at night.
   const skyUniforms = { top: { value: new THREE.Color() }, horizon: { value: new THREE.Color() }, sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunColor: { value: new THREE.Color() }, stars: { value: 0 } };
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(3800, 32, 16), new THREE.ShaderMaterial({
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(8000, 32, 16), new THREE.ShaderMaterial({
     uniforms: skyUniforms, side: THREE.BackSide, depthWrite: false, fog: false,
     vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
     fragmentShader: `uniform vec3 top; uniform vec3 horizon; uniform vec3 sunDir; uniform vec3 sunColor; uniform float stars; varying vec3 vDir;
@@ -47,7 +47,7 @@ export function buildLighting(ctx) {
     cur.sunDir = dir;
     sun.color.copy(mixColor(a.sunColor, b.sunColor)); sun.intensity = mix(a.sunI, b.sunI);
     hemi.color.copy(mixColor(a.hemiSky, b.hemiSky)); hemi.groundColor.copy(mixColor(a.hemiGround, b.hemiGround)); hemi.intensity = mix(a.hemiI, b.hemiI);
-    scene.fog.color.copy(mixColor(a.fog, b.fog)); scene.fog.near = mix(a.fogNear, b.fogNear); scene.fog.far = mix(a.fogFar, b.fogFar);
+    scene.fog.color.copy(mixColor(a.fog, b.fog)); cur.fogNear = mix(a.fogNear, b.fogNear); cur.fogFar = mix(a.fogFar, b.fogFar); scene.fog.near = cur.fogNear; scene.fog.far = cur.fogFar;
     skyUniforms.top.value.copy(mixColor(a.top, b.top)); skyUniforms.horizon.value.copy(mixColor(a.horizon, b.horizon)); skyUniforms.sunDir.value.copy(dir); skyUniforms.sunColor.value.copy(sun.color); skyUniforms.stars.value = mix(a.stars, b.stars);
     renderer.toneMappingExposure = mix(a.exposure, b.exposure);
     if (ctx.lampHeadMat) ctx.lampHeadMat.emissiveIntensity = mix(a.lamps, b.lamps);
@@ -70,6 +70,8 @@ export function buildLighting(ctx) {
       const d = cur.sunDir; sun.position.set(carPos.x + d.x * 400, d.y * 400, carPos.z + d.z * 400); sun.target.position.set(carPos.x, 0, carPos.z);
       // The sky dome follows the camera (not the car) so the title orbit and swoop never clip it.
       const cp = ctx.camera ? ctx.camera.position : carPos; sky.position.set(cp.x, 0, cp.z);
+      // Fog opens up with altitude so the whole site (and the far plain) reads from the air.
+      const fa = 1 + Math.min(1400, Math.max(0, cp.y - 20)) / 220; scene.fog.near = cur.fogNear * fa; scene.fog.far = Math.min(7500, cur.fogFar * fa);
     },
     get name() { return state.target; },
     get isNight() { return cur.night; },

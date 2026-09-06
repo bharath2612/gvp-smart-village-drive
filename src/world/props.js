@@ -56,8 +56,9 @@ export function buildProps(ctx) {
   }
   const temple = world.amenities.find((a) => a.id === 'temple');
   if (temple) { const cx = temple.x + temple.w / 2, cz = temple.y + temple.h / 2; for (let i = 0; i < 40; i++) { const k = fkeys[i % fkeys.length]; if (!k) break; const a = (i / 40) * Math.PI * 2; const rad = 52 + (i % 2) * 3; flowers[k].push({ x: cx + Math.cos(a) * rad, z: cz + Math.sin(a) * rad, rot: r() * 6.28, sx: 1.3, sy: 1.3, sz: 1.3 }); } }
-  if (models.pot_large && pots.length) scene.add(instancedChunks(models.pot_large.geo, flat, pots, { name: 'planters', chunk: 400, castShadow: true }));
-  for (const k of fkeys) if (flowers[k].length) scene.add(instancedChunks(models[k].geo, flat, flowers[k], { name: `flowers-${k}`, chunk: 300 }));
+  const cull = (root, dist) => { scene.add(root); (ctx.cullGroups = ctx.cullGroups || []).push({ root, dist }); };
+  if (models.pot_large && pots.length) cull(instancedChunks(models.pot_large.geo, flat, pots, { name: 'planters', chunk: 400, castShadow: true }), 700);
+  for (const k of fkeys) if (flowers[k].length) cull(instancedChunks(models[k].geo, flat, flowers[k], { name: `flowers-${k}`, chunk: 300 }), 600);
 
   // Rocks along the lake shore (solid), log stacks by a few farmhouses.
   const rocks = [];
@@ -68,5 +69,5 @@ export function buildProps(ctx) {
   if (models.rock_largeA) scene.add(instancedChunks(models.rock_largeA.geo, flat, rocks, { name: 'rocks', chunk: 400, castShadow: true }));
   const logs = [];
   for (const p of world.plots) if (p.type === 'farm' && hashStr(p.id + 'log') % 5 === 0 && p.pad) logs.push({ x: p.pad.x + 2, z: p.pad.y + p.pad.h - 3, rot: 0 });
-  if (models.log_stack) scene.add(instancedChunks(models.log_stack.geo, flat, logs, { name: 'logs', chunk: 400 }));
+  if (models.log_stack) cull(instancedChunks(models.log_stack.geo, flat, logs, { name: 'logs', chunk: 400 }), 700);
 }

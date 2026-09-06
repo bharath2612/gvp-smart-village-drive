@@ -13,7 +13,7 @@
   <div id="title" class="screen hidden">
     <div class="logo">GVP Smart Village · SV-1</div>
     <h1>Smart Village Drive</h1>
-    <div class="sub">3 km × 3 km at real scale · 564 farms · 560 villas · 504 town houses · one SUV</div>
+    <div class="sub">3 km × 3 km at real scale · 564 farms · 560 villas · 504 town houses · an SUV, a motor boat and a charter plane</div>
     <div id="best-lap"></div>
     <div><button id="start-btn" class="btn gold">Start driving</button></div>
     <div><button id="title-missions" class="btn small">Missions</button><button id="title-settings" class="btn small">Settings</button><a class="btn small" href="https://gvp-smart-village-plan.vercel.app" target="_blank" rel="noopener">2D plan viewer</a></div>
@@ -21,18 +21,20 @@
   </div>
   <div id="hud" class="hidden">
     <div id="nearest-wrap" class="panel"><div class="lbl">Nearest plot</div><div id="nearest">Open road</div></div>
-    <div id="compass" class="panel"><div id="compass-heading">N 0°</div><div id="zone">Commercial spine</div></div>
+    <div id="compass" class="panel"><div id="compass-heading">N 0°</div><div id="zone">Commercial spine</div><div id="alt-readout"></div></div>
     <div id="top-right"><button id="tod-btn" class="btn">☀ Day</button><button id="mute-btn" class="btn">🔊</button><button id="pause-btn" class="btn">☰</button></div>
     <div id="mission-timer" class="panel"></div>
     <div id="mission-arrow"><svg viewBox="0 0 40 40"><path d="M20 3 L34 30 L20 23 L6 30 Z" fill="#c9a227" stroke="#0a0f1c" stroke-width="1.5"/></svg></div>
     <div id="mission-dist"></div>
     <div id="wrongway">WRONG WAY</div>
+    <div id="flight-banner"></div>
     <div id="speedo" class="panel"><canvas id="gauge" width="220" height="220"></canvas><div class="row"><span id="gear">D</span><span id="hb">HANDBRAKE</span><span id="cam-mode">chase</span></div></div>
     <canvas id="minimap" class="panel" width="220" height="220" title="Open the map"></canvas>
     <div id="mm-zoom"><button id="mm-plus" title="Zoom in">+</button><button id="mm-minus" title="Zoom out">−</button></div>
     <div id="toast" class="panel"></div>
     <div id="swap-prompt" class="panel"><span id="swap-text">Swap into the Sedan</span><button id="swap-btn" class="btn gold small">Swap car · E</button></div>
     <div id="boat-prompt" class="panel"><span id="boat-text">Take a boat out on the lake?</span><button id="boat-btn" class="btn gold small">Yes · B</button></div>
+    <div id="fly-prompt" class="panel"><span id="fly-prompt-text">Take the charter plane up?</span><button id="fly-prompt-btn" class="btn gold small">Yes · F</button></div>
     <div id="plot-card" class="panel"></div>
     <div id="controls-card" class="panel">
       <span><b>W / ↑</b> throttle</span><span><b>S / ↓</b> brake · reverse</span>
@@ -41,7 +43,15 @@
       <span><b>R</b> reset to road</span><span><b>N</b> time of day</span>
       <span><b>T</b> teleport to plot</span><span><b>M</b> map</span>
       <span><b>Tab</b> missions</span><span><b>Esc</b> pause · settings</span>
-      <span><b>Mouse drag</b> orbit when stopped</span><span><b>E</b> swap into a parked car</span><span><b>B</b> boat at the lake marina</span>
+      <span><b>Mouse drag</b> orbit when stopped</span><span><b>E</b> swap into a parked car</span><span><b>B</b> boat at the lake marina</span><span><b>F</b> plane at the airstrip hangar</span>
+    </div>
+    <div id="controls-card-plane" class="panel">
+      <span><b>W / S</b> throttle up · down</span><span><b>Shift</b> full power</span>
+      <span><b>↓ / ↑</b> pull up · push down</span><span><b>← →</b> bank left · right</span>
+      <span><b>A D</b> rudder · nosewheel</span><span><b>Space</b> wheel brakes</span>
+      <span><b>V</b> flaps 0 · 10 · 30</span><span><b>C</b> camera</span>
+      <span><b>R</b> back to the runway</span><span><b>F</b> park the plane (on the apron)</span>
+      <span><b>M</b> map · set a waypoint</span><span><b>Esc</b> pause · settings</span>
     </div>
     <div id="debug" class="panel hidden"></div>
   </div>
@@ -53,6 +63,9 @@
     <div class="setting"><span>Master volume</span><input id="s-master" type="range" min="0" max="100"></div>
     <div class="setting"><span>Engine volume</span><input id="s-engine" type="range" min="0" max="100"></div>
     <div class="setting"><span>Ambience volume</span><input id="s-ambience" type="range" min="0" max="100"></div>
+    <div class="setting"><span>Vehicle</span><select id="s-vehicle"><option value="car">Car (SUV)</option><option value="plane">Charter plane</option></select></div>
+    <div class="setting"><span>Flight assist</span><select id="s-assist"><option value="full">Full (auto-level, stall protection)</option><option value="light">Light</option><option value="off">Off</option></select></div>
+    <div class="setting"><span>Flight pitch</span><select id="s-pitch"><option value="pilot">Pilot: ↓ pulls the nose up</option><option value="arcade">Arcade: ↑ pulls the nose up</option></select></div>
     <div class="setting"><span>Chase distance</span><select id="s-chase"><option value="near">Near</option><option value="normal">Normal</option><option value="far">Far</option></select></div>
     <div class="setting"><span>Invert steering</span><input id="s-invert" type="checkbox"></div>
     <div class="setting"><span>Minimap</span><select id="s-minimap"><option value="north">North-up</option><option value="rotate">Rotating</option></select></div>
@@ -62,6 +75,7 @@
   <div id="complete"><div class="panel"><h2 id="complete-title">Complete</h2><div id="complete-body"></div><button class="btn gold" data-act="driveon">Drive on</button><button class="btn" data-act="next">Missions</button></div></div>
   <div id="resume-count"></div>
   <div id="splash" class="splash-fade"></div>
+  <div id="blackout"></div>
   <div id="tuning" class="panel hidden"></div>
   <div id="fatal" hidden><h2>Cannot start</h2><p></p></div>
   <script type="module" src="/src/main.js"></script>

@@ -18,6 +18,18 @@ export function defineMissions(world) {
       ] },
     { id: 'parks', name: 'All four parks', desc: 'Visit the four 5 ha parks in any order. Timer runs.', ordered: false,
       rings: L.parks.map((p) => ({ x: p.x + p.w / 2, z: p.y + p.h / 2, text: `${p.id}: ${p.w.toFixed(0)} x ${p.h.toFixed(0)} m` })) },
+    { id: 'sky', name: 'Sky tour', desc: 'Charter plane only: fly the rings from the airstrip over the spine, stadium, temple and lake, then back over runway 27.', ordered: true, plane: true,
+      rings: [
+        { x: 1100, z: 3180, y: 60, text: 'Climb out over runway 09 and turn north over the wall.' },
+        { x: 1500, z: 2600, y: 140, text: 'The 30 m spine below runs the full 3 km north to south.' },
+        { x: 1700, z: 2100, y: 160, text: 'School and cricket stadium: 5.2 ha and 4.2 ha.' },
+        { x: 2174, z: 2135, y: 170, text: 'Temple on its 200 x 200 m lot; the lake district beyond.' },
+        { x: lake.x + lake.w / 2, z: lake.y + lake.h / 2, y: 180, text: '46 ha of water. Circle the lake and head back south.' },
+        { x: 2400, z: 1200, y: 220, text: 'Four 5 ha parks are spread across the plan; the farms fill the west.' },
+        { x: 900, z: 1500, y: 240, text: 'Farm plots: 564 of them, one hectare each.' },
+        { x: 1300, z: 2700, y: 150, text: 'Line up for runway 27: fly east of the strip and turn in.' },
+        { x: 1450, z: 3180, y: 60, text: 'Over the threshold of 27. Land whenever you like. Mission complete.' },
+      ] },
     { id: 'lap', name: 'Boundary lap', desc: 'Clockwise lap of the 25 m boundary road from the gate. Best time is saved.', ordered: true, timed: true, lap: true,
       rings: [
         { x: 1500 - 1, z: 2987, text: 'Start line' },
@@ -44,8 +56,8 @@ export class Missions {
     this.active = m; this.time = 0; this.done = new Set(); this.next = 0;
     m.rings.forEach((r, i) => {
       const g = new THREE.Group(); g.position.set(r.x, 0, r.z);
-      const ring = new THREE.Mesh(this.ringGeo, this.ringMat.clone()); ring.position.y = 5; g.add(ring);
-      const beam = new THREE.Mesh(this.beamGeo, this.beamMat); beam.position.y = 100; g.add(beam);
+      const ring = new THREE.Mesh(this.ringGeo, this.ringMat.clone()); ring.position.y = r.y ? r.y : 5; if (r.y) { ring.scale.set(2.5, 2.5, 2.5); ring.rotation.x = Math.PI / 2; } g.add(ring);
+      const beam = new THREE.Mesh(this.beamGeo, this.beamMat); beam.position.y = r.y ? r.y / 2 : 100; if (r.y) beam.scale.y = r.y / 200; g.add(beam);
       this.scene.add(g); this.meshes.push(g); r.mesh = g; r.ringMat = ring.material;
     });
     this.updateVisibility();
@@ -61,11 +73,12 @@ export class Missions {
     const m = this.active; if (!m) return;
     this.time += dt; this._cx = car.x; this._cz = car.z;
     const t = performance.now() / 1000;
-    for (const g of this.meshes) if (g.visible) g.children[0].rotation.y = t * 0.8;
+    for (const g of this.meshes) if (g.visible) g.children[0].rotation.z = t * 0.8;
     m.rings.forEach((r, i) => {
       if (this.done.has(i)) return;
       if (m.ordered && i !== this.next) return;
-      if (Math.hypot(car.x - r.x, car.z - r.z) < 7) {
+      const hit = r.y ? Math.hypot(car.x - r.x, (car.y || 0) - r.y, car.z - r.z) < 18 : Math.hypot(car.x - r.x, car.z - r.z) < 7;
+      if (hit) {
         this.done.add(i); if (m.ordered) this.next = i + 1;
         this.audio.chime(); if (r.text) this.ui.toast(r.text, 5);
         this.updateVisibility();

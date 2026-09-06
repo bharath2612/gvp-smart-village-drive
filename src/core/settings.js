@@ -2,6 +2,7 @@
 const DEFAULTS = {
   quality: 'auto', timeOfDay: 'day', master: 80, engine: 70, ambience: 60, chaseDistance: 'normal', invertSteer: false,
   minimapMode: 'north', muted: false, bestLap: null, seenControls: false,
+  vehicle: 'car', flightAssist: 'full', pitchMode: 'pilot',
 };
 const KEY = 'svd-settings-v1';
 export class Settings {
@@ -12,6 +13,7 @@ export class Settings {
     const q = new URLSearchParams(location.search);
     if (q.get('quality')) this.data.quality = q.get('quality');
     if (q.get('tod')) this.data.timeOfDay = q.get('tod');
+    if (q.get('vehicle')) this.data.vehicle = q.get('vehicle');
   }
   get(k) { return this.data[k]; }
   set(k, v) { this.data[k] = v; this.save(); this.listeners.forEach((fn) => fn(k, v)); }

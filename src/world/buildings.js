@@ -183,12 +183,12 @@ export function buildBuildings(ctx) {
       items[key][v].push({ x: cx, z: cz, rot: FACING_ROT[p.facing] || 0, color: tint(p.id) });
       // Colliders use the archetype footprint, oriented by facing (all N/S here so width stays along X).
       const fw = key === 'villa' ? 20.6 : key === 'townhouse' ? 15.2 : 22.6; const fd = key === 'villa' ? 15.6 : key === 'townhouse' ? 10.4 : 11.6;
-      colliders.add(cx - fw / 2, cz - fd / 2, cx + fw / 2, cz + fd / 2, 'house', p);
+      colliders.add(cx - fw / 2, cz - fd / 2, cx + fw / 2, cz + fd / 2, 'house', p, key === 'villa' ? 9 : key === 'townhouse' ? 10 : 6);
       if (p.type === 'farm' && p.pool) { colliders.addRect(p.pool, 'pool', p); }
     } else if (p.type === 'commercial') {
       const cx = p.x + p.w / 2, cz = p.y + p.h / 2;
       items.commercial[0].push({ x: cx, z: cz, rot: FACING_ROT[p.facing], color: tint(p.id) });
-      colliders.add(cx - 20.3, cz - 12.8, cx + 20.3, cz + 12.8, 'house', p);
+      colliders.add(cx - 20.3, cz - 12.8, cx + 20.3, cz + 12.8, 'house', p, 15);
     }
   }
   for (const key of Object.keys(arche)) arche[key].forEach((a, i) => {

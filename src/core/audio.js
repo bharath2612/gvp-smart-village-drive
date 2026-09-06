@@ -13,7 +13,7 @@ export class AudioMixer {
       this.engineBus = ctx.createGain(); this.engineBus.connect(this.master);
       this.ambBus = ctx.createGain(); this.ambBus.connect(this.master);
       this.fxBus = ctx.createGain(); this.fxBus.connect(this.master);
-      this._buildEngine(); this._buildWind(); this._buildTyres(); this._buildAmbience();
+      this._buildEngine(); this._buildPlane(); this._buildWind(); this._buildTyres(); this._buildAmbience();
       this.applyVolumes();
       this.ready = true;
       if (ctx.state === 'suspended') ctx.resume();
@@ -48,6 +48,23 @@ export class AudioMixer {
     this.boostGain = ctx.createGain(); this.boostGain.gain.value = 0;
     this.boostSrc.connect(this.boostFilter); this.boostFilter.connect(this.boostGain); this.boostGain.connect(this.engineBus); this.boostSrc.start();
   }
+  // Piston-prop engine: low sawtooth/triangle fundamental with an amplitude-modulated noise "chop" at the blade-pass rate.
+  _buildPlane() {
+    const ctx = this.ctx;
+    this.propOsc = [ctx.createOscillator(), ctx.createOscillator(), ctx.createOscillator()];
+    this.propOsc[0].type = 'sawtooth'; this.propOsc[1].type = 'triangle'; this.propOsc[2].type = 'square';
+    this.propFilter = ctx.createBiquadFilter(); this.propFilter.type = 'lowpass'; this.propFilter.frequency.value = 500; this.propFilter.Q.value = 1.2;
+    this.propGain = ctx.createGain(); this.propGain.gain.value = 0;
+    const mix = [0.3, 0.35, 0.08];
+    this.propOsc.forEach((o, i) => { const g = ctx.createGain(); g.gain.value = mix[i]; o.connect(g); g.connect(this.propFilter); o.start(); });
+    this.propFilter.connect(this.propGain); this.propGain.connect(this.engineBus);
+    this.chopSrc = ctx.createBufferSource(); this.chopSrc.buffer = this._noise(2); this.chopSrc.loop = true;
+    this.chopFilter = ctx.createBiquadFilter(); this.chopFilter.type = 'bandpass'; this.chopFilter.frequency.value = 900; this.chopFilter.Q.value = 0.7;
+    this.chopGain = ctx.createGain(); this.chopGain.gain.value = 0;
+    this.chopLfo = ctx.createOscillator(); this.chopLfo.type = 'sine'; this.chopLfo.frequency.value = 40; this.chopDepth = ctx.createGain(); this.chopDepth.gain.value = 0; this.chopLfo.connect(this.chopDepth); this.chopDepth.connect(this.chopGain.gain); this.chopLfo.start();
+    this.chopSrc.connect(this.chopFilter); this.chopFilter.connect(this.chopGain); this.chopGain.connect(this.engineBus); this.chopSrc.start();
+    this.hornOsc = ctx.createOscillator(); this.hornOsc.type = 'square'; this.hornOsc.frequency.value = 1200; this.hornGain = ctx.createGain(); this.hornGain.gain.value = 0; this.hornOsc.connect(this.hornGain); this.hornGain.connect(this.fxBus); this.hornOsc.start();
+  }
   _buildWind() {
     const ctx = this.ctx;
     this.windSrc = ctx.createBufferSource(); this.windSrc.buffer = this._noise(3); this.windSrc.loop = true;
@@ -77,6 +94,8 @@ export class AudioMixer {
   update(dt, t) {
     if (!this.ready) return;
     const ctx = this.ctx; const now = ctx.currentTime;
+    if (t.mode === 'plane') return this._updatePlane(dt, t, now);
+    this.propGain.gain.setTargetAtTime(0, now, 0.1); this.chopGain.gain.setTargetAtTime(0, now, 0.1); this.chopDepth.gain.setTargetAtTime(0, now, 0.1); this.hornGain.gain.setTargetAtTime(0, now, 0.05);
     const rpm = 0.15 + Math.min(1, Math.abs(t.speed) / 33.3) * 0.85 + t.throttle * 0.12;
     const f = 40 + rpm * 190;
     this.engOsc[0].frequency.setTargetAtTime(f, now, 0.05);
@@ -100,6 +119,22 @@ export class AudioMixer {
       if (this.ambMode === 'night') this._cricket(); else this._bird();
     }
   }
+  _updatePlane(dt, t, now) {
+    this.engGain.gain.setTargetAtTime(0, now, 0.1); this.boostGain.gain.setTargetAtTime(0, now, 0.1); this.tyreGain.gain.setTargetAtTime(0, now, 0.1);
+    const rpm = t.rpm; const f = 28 + rpm * 62;                      // 1700-5400 rpm equivalents
+    this.propOsc[0].frequency.setTargetAtTime(f, now, 0.08); this.propOsc[1].frequency.setTargetAtTime(f * 2, now, 0.08); this.propOsc[2].frequency.setTargetAtTime(f * 0.5, now, 0.08);
+    this.propFilter.frequency.setTargetAtTime(250 + rpm * 1500, now, 0.1);
+    this.propGain.gain.setTargetAtTime(0.14 + rpm * 0.22, now, 0.08);
+    this.chopLfo.frequency.setTargetAtTime(f * 2, now, 0.08); this.chopDepth.gain.setTargetAtTime(0.05 + rpm * 0.12, now, 0.1); this.chopGain.gain.setTargetAtTime(0.05 + rpm * 0.12, now, 0.1);
+    this.chopFilter.frequency.setTargetAtTime(500 + rpm * 1400, now, 0.1);
+    const sp = Math.min(1, t.speed / 70); this.windGain.gain.setTargetAtTime(sp * sp * 0.6, now, 0.1); this.windFilter.frequency.setTargetAtTime(300 + sp * 2200, now, 0.1);
+    this.gravelGain.gain.setTargetAtTime(t.onGround ? Math.min(0.4, t.speed / 30) : 0, now, 0.1); this.gravelFilter.frequency.setTargetAtTime(220, now, 0.05);
+    // Stall horn: warbling square wave.
+    this.hornOsc.frequency.setTargetAtTime(1100 + Math.sin(now * 12) * 150, now, 0.02); this.hornGain.gain.setTargetAtTime(t.stalled ? 0.06 : 0, now, 0.03);
+    this._ambTimer -= dt; if (this._ambTimer <= 0) { this._ambTimer = 2 + Math.random() * 3; if (t.onGround && this.ambMode !== 'night') this._bird(); }
+  }
+  squeal() { this._burst(0.35, 1800, 3, 0.4, 'bandpass'); this._burst(0.2, 200, 1, 0.5); }
+  crash() { this._burst(1.6, 160, 0.8, 1.0); this._burst(0.5, 900, 0.8, 0.6, 'bandpass'); this._tone(50, 1.2, 'sine', 0.6, this.fxBus, 20); }
   setAmbience(mode) { this.ambMode = mode; }
   _tone(freq, dur, type, gain, bus, glide) {
     if (!this.ready) return;

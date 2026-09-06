@@ -2,6 +2,7 @@
 import { CONFIG, KMH } from '../config.js';
 import { fmtTime } from '../game/missions.js';
 import { describe, mailtoFor, availabilityOf } from '../game/plots.js';
+import { drawFlightDial } from '../plane/hud.js';
 
 const $ = (id) => document.getElementById(id);
 export class UI {
@@ -58,13 +59,27 @@ export class UI {
   showBoatPrompt(text, btn) { const el = $('boat-prompt'); if (!text) { el.classList.remove('show'); return; } $('boat-text').textContent = text; $('boat-btn').textContent = btn || 'Yes · B'; el.classList.add('show'); }
   showSwapPrompt(text) { const el = $('swap-prompt'); if (!text) { el.classList.remove('show'); return; } $('swap-text').textContent = text; el.classList.add('show'); }
   setWrongWay(on) { this.el.wrong.classList.toggle('show', on); }
-  showControls(seconds) { this.el.controls.classList.add('show'); clearTimeout(this._ct); if (seconds) this._ct = setTimeout(() => this.el.controls.classList.remove('show'), seconds * 1000); }
-  hideControls() { this.el.controls.classList.remove('show'); }
+  showFlyPrompt(text, btn) { const el = $('fly-prompt'); if (!text) { el.classList.remove('show'); return; } $('fly-prompt-text').textContent = text; $('fly-prompt-btn').textContent = btn || 'Yes · F'; el.classList.add('show'); }
+  setControlsMode(mode) { this.mode = mode; this.hideControls(); }
+  showControls(seconds) { const el = this.mode === 'plane' ? $('controls-card-plane') : this.el.controls; el.classList.add('show'); clearTimeout(this._ct); if (seconds) this._ct = setTimeout(() => el.classList.remove('show'), seconds * 1000); }
+  hideControls() { this.el.controls.classList.remove('show'); $('controls-card-plane').classList.remove('show'); }
+  banner(text, cls = 'warn') { const b = $('flight-banner'); if (!text) { b.classList.remove('show'); return; } b.textContent = text; b.className = `${cls} show`; }
   update(dt, car, world, missions, lighting, camMode) {
     const e = this.el;
     const kmh = Math.abs(car.speed) * KMH;
-    this.drawGauge(kmh, car.boostCharge, car.boosting, dt);
-    e.gear.textContent = car.speed < -0.3 ? 'R' : 'D'; e.hb.classList.toggle('on', car.handbrakeOn);
+    if (car.isPlane) {
+      drawFlightDial(this.el.gauge, this.gaugeDpr, car, this, dt);
+      e.gear.textContent = car.onGround ? (car.brakes ? 'BRK' : 'GND') : 'AIR'; e.hb.classList.toggle('on', car.brakes && car.onGround); e.hb.textContent = car.flaps ? `FLAPS ${car.flaps}°` : 'FLAPS UP';
+      $('alt-readout').textContent = `ALT ${Math.round(car.y)} m · VS ${car.vs >= 0 ? '+' : ''}${car.vs.toFixed(1)} m/s · ${Math.round(kmh)} km/h`;
+      if (car.stalled) this.banner('STALL · NOSE DOWN, POWER UP', 'warn');
+      else if (car.autopilot) this.banner('AUTOPILOT · RETURNING TO GVP SMART VILLAGE', 'info');
+      else if (car.boundaryT > 0) this.banner(`RETURN TO GVP SMART VILLAGE · ${Math.ceil(car.boundaryT)}`, 'warn');
+      else if (car.ceilingWarn) this.banner('CEILING · ENGINE LOSING POWER', 'info');
+      else this.banner(null);
+    } else {
+      this.drawGauge(kmh, car.boostCharge, car.boosting, dt);
+      e.gear.textContent = car.speed < -0.3 ? 'R' : 'D'; e.hb.classList.toggle('on', car.handbrakeOn); e.hb.textContent = 'HANDBRAKE'; $('alt-readout').textContent = ''; this.banner(null);
+    }
     const deg = ((car.yaw * 180 / Math.PI) % 360 + 360) % 360;
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     e.compass.textContent = `${dirs[Math.round(deg / 45) % 8]} ${Math.round(deg)}°`;
@@ -75,7 +90,7 @@ export class UI {
     if (missions.active) { e.timer.textContent = `${missions.active.name} · ${fmtTime(missions.time)} · ${missions.done.size}/${missions.active.rings.length}`; e.timer.classList.add('show'); } else e.timer.classList.remove('show');
     if (this.toastTimer > 0) { this.toastTimer -= dt; if (this.toastTimer <= 0) e.toast.classList.remove('show'); }
     // Mission arrow
-    const tgt = missions.target();
+    const tgt = missions.target() || this.waypoint;
     if (tgt) { const ang = Math.atan2(tgt.x - car.x, -(tgt.z - car.z)) - car.yaw; e.arrow.style.transform = `rotate(${ang}rad)`; e.arrow.classList.add('show'); $('mission-dist').textContent = `${Math.round(Math.hypot(tgt.x - car.x, tgt.z - car.z))} m`; }
     else e.arrow.classList.remove('show');
   }

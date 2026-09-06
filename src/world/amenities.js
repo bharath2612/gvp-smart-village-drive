@@ -81,7 +81,7 @@ export function buildAmenities(ctx) {
     ring(glow, cx, tz, cw / 2 + 0.3, y + 0.9);
     // Dwarf columns at the plinth corners, lamp bowls on the entrance path.
     for (const [sx, sz] of [[-33, -33], [33, -33], [-33, 33], [33, 33]]) sand.push(cyl(0.45, 0.55, 4, 10, SAND2, { x: cx + sx, z: cz + sz, y: 2.5 + 2 }));
-    solid(cx - 35, cz - 35, cx + 35, cz + 35, 'amenity', plotOf('temple'));
+    solid(cx - 35, cz - 35, cx + 35, cz + 35, 'amenity', plotOf('temple'), 34);
   }
   // School and stadium: see campus.js.
   // Agro plant: sheds, silos, fence.
@@ -98,13 +98,13 @@ export function buildAmenities(ctx) {
     plaster.push(box(w, 8, d, 0xf1eee8, { x: x + w / 2, z: z + d / 2, y: 4 })); plaster.push(box(w + 0.4, 2.2, d + 0.4, 0xc0392b, { x: x + w / 2, z: z + d / 2, y: 7 }));
     for (let i = 0; i < 3; i++) dark.push(box(9, 5.5, 0.4, 0x4b5058, { x: x + 10 + i * 18, z: z + d + 0.1, y: 2.75 }));
     plaster.push(box(8, 20, 8, 0xc0392b, { x: x + w + 8, z: z + 8, y: 10 }));
-    solid(x, z, x + w, z + d, 'amenity', p); solid(x + w + 4, z + 4, x + w + 12, z + 12, 'amenity', p);
+    solid(x, z, x + w, z + d, 'amenity', p, 12); solid(x + w + 4, z + 4, x + w + 12, z + 12, 'amenity', p, 24);
   }
   // Water treatment: four round tanks, control building and a water tower landmark.
   { const a = A.wtp; const p = plotOf('wtp');
     for (const [i, j] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const x = a.x + 50 + i * 70, z = a.y + 55 + j * 70; metal.push(cyl(22, 22, 5, 32, 0xb8c2cc, { x, z, y: 2.5 })); const wg = new THREE.CircleGeometry(21, 32); wg.rotateX(-Math.PI / 2); wg.translate(x, 5.05, z); metal.push(wg.setAttribute('color', new THREE.Float32BufferAttribute(new Array(wg.attributes.position.count * 3).fill(0.3), 3)) && wg); solid(x - 22, z - 22, x + 22, z + 22, 'amenity', p); }
     plaster.push(box(30, 5, 16, 0xf1eee8, { x: a.x + 30, z: a.y + a.h - 20, y: 2.5 })); solid(a.x + 15, a.y + a.h - 28, a.x + 45, a.y + a.h - 12, 'amenity', p);
-    const tx = a.x + a.w - 25, tz = a.y + 25; metal.push(cyl(1.2, 1.6, 34, 10, 0xcfd6dd, { x: tx, z: tz, y: 17 })); metal.push(cyl(9, 7, 10, 20, 0xe4e8ec, { x: tx, z: tz, y: 39 })); metal.push(cyl(0, 9, 3, 20, 0xc9a227, { x: tx, z: tz, y: 45.5 })); solid(tx - 2, tz - 2, tx + 2, tz + 2, 'amenity', p);
+    const tx = a.x + a.w - 25, tz = a.y + 25; metal.push(cyl(1.2, 1.6, 34, 10, 0xcfd6dd, { x: tx, z: tz, y: 17 })); metal.push(cyl(9, 7, 10, 20, 0xe4e8ec, { x: tx, z: tz, y: 39 })); metal.push(cyl(0, 9, 3, 20, 0xc9a227, { x: tx, z: tz, y: 45.5 })); solid(tx - 9, tz - 9, tx + 9, tz + 9, 'amenity', p, 47);
   }
   // Parks: pavilions and paths.
   for (const pk of world.parks) {

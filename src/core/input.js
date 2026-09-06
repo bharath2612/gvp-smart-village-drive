@@ -3,6 +3,7 @@ export class Input {
   constructor() {
     this.keys = new Set();
     this.throttle = 0; this.brake = 0; this.steer = 0; this.handbrake = false; this.boost = false;
+    this.pitch = 0; this.roll = 0; this.yaw = 0; this.invertPitch = false;
     this.actions = {};
     this.enabled = true;
     this.invertSteer = false;
@@ -27,7 +28,7 @@ export class Input {
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     const k = e.code;
     if (down && !e.repeat) {
-      const map = { KeyC: 'camera', KeyR: 'reset', KeyN: 'timeOfDay', KeyT: 'teleport', KeyM: 'map', Tab: 'missions', KeyX: 'mute', Escape: 'pause', Backquote: 'debug', KeyH: 'help', Enter: 'confirm', KeyE: 'swap', KeyB: 'boat' };
+      const map = { KeyC: 'camera', KeyR: 'reset', KeyN: 'timeOfDay', KeyT: 'teleport', KeyM: 'map', Tab: 'missions', KeyX: 'mute', Escape: 'pause', Backquote: 'debug', KeyH: 'help', Enter: 'confirm', KeyE: 'swap', KeyB: 'boat', KeyF: 'fly', KeyV: 'flaps' };
       if (map[k]) { this.fire(map[k], e); if (k === 'Tab') e.preventDefault(); }
     }
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(k)) e.preventDefault();
@@ -44,5 +45,13 @@ export class Input {
     this.steer = this.invertSteer ? -s : s;
     this.handbrake = on && has('Space');
     this.boost = on && has('ShiftLeft', 'ShiftRight');
+    // Flight axes: arrows pitch/roll (pilot convention: down arrow pulls the nose up), A/D rudder.
+    let p = 0; if (on && has('ArrowDown')) p += 1; if (on && has('ArrowUp')) p -= 1;
+    this.pitch = this.invertPitch ? -p : p;
+    let r = 0; if (on && has('ArrowRight')) r += 1; if (on && has('ArrowLeft')) r -= 1;
+    this.roll = r;
+    let y = 0; if (on && has('KeyD')) y += 1; if (on && has('KeyA')) y -= 1;
+    this.yaw = y;
+    this.throttleUp = on && has('KeyW'); this.throttleDown = on && has('KeyS');
   }
 }

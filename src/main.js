@@ -28,6 +28,11 @@ import { loadPlotData } from './game/plots.js';
 import { Minimap } from './ui/minimap.js';
 import { CarSwap } from './game/swap.js';
 import { BoatModel, BoatVisual } from './boat/boat.js';
+import { PlaneModel } from './plane/plane.js';
+import { PlaneVisual } from './plane/visual.js';
+import { buildAirstrip } from './world/airstrip.js';
+import { buildHorizon } from './world/horizon.js';
+import { Vehicles } from './game/vehicles.js';
 import { UI } from './ui/hud.js';
 import { clamp, lerp } from './util/math.js';
 
@@ -48,7 +53,7 @@ async function boot() {
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1;
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); ui.fatal('The graphics context was lost. Reload the page to continue.'); });
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 4200);
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, CONFIG.world.cameraFar);
   window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(Math.min(window.devicePixelRatio, Q.dpr)); });
 
   ui.setLoading(0.02, 'Loading the verified layout…');
@@ -72,6 +77,8 @@ async function boot() {
     ['Laying the ground…', () => buildGround(ctx)],
     ['Building 91 roads, kerbs and lamp posts…', () => buildRoads(ctx)],
     ['Raising the 20 ft boundary wall…', () => buildWall(ctx)],
+    ['Paving GVP Airstrip…', () => buildAirstrip(ctx)],
+    ['Far fields and hills…', () => buildHorizon(ctx)],
     ['Generating 1,698 buildings…', () => buildBuildings(ctx)],
     ['Temple, school, stadium, agro plant…', () => buildAmenities(ctx)],
     ['Cricket stadium and school campus…', () => { buildStadium(ctx); buildSchool(ctx); }],
@@ -85,9 +92,9 @@ async function boot() {
   for (let i = 0; i < steps.length; i++) { ui.setLoading(0.15 + (i / steps.length) * 0.8, steps[i][0]); await nextFrame(); steps[i][1](); }
   console.log(`[world] built in ${Math.round(performance.now() - t0)} ms, colliders ${colliders.list.length}, trees ${ctx.treeCount}, crop shrubs ${ctx.shrubCount}`);
   // Paved (non-slowing) areas besides roads.
-  ctx.pavedRects = [...world.L.commercial, ...world.L.amenities.filter((a) => ['parking', 'agro', 'fire-station', 'wtp', 'school', 'stadium'].includes(a.id)), ...world.L.parks.map((p) => ({ x: p.x, y: p.y + p.h / 2 - 2, w: p.w, h: 4 }))];
+  ctx.pavedRects = [...world.L.commercial, ...world.L.amenities.filter((a) => ['parking', 'agro', 'fire-station', 'wtp', 'school', 'stadium'].includes(a.id)), ...world.L.parks.map((p) => ({ x: p.x, y: p.y + p.h / 2 - 2, w: p.w, h: 4 })), ...ctx.airstrip.paved];
 
-  const input = new Input(); input.invertSteer = settings.get('invertSteer');
+  const input = new Input(); input.invertSteer = settings.get('invertSteer'); input.invertPitch = settings.get('pitchMode') === 'arcade';
   const car = new CarModel(world, colliders, ctx);
   const carVisual = new CarVisual(scene, ctx.T, carModel);
   const rig = new CameraRig(camera, settings);
@@ -95,26 +102,18 @@ async function boot() {
   const swap = new CarSwap(ctx, car, carVisual, rig, ui, audio);
   // Boating: park the car at the marina, take the motor boat from the pier, return the same way.
   const boat = new BoatModel(ctx); const boatVisual = new BoatVisual(scene, ctx);
-  const veh = () => (G.boating ? boat : car);
-  function enterBoat() {
-    if (G.boating) return; const m = ctx.marina;
-    car.reset(m.park.x, m.park.z, m.park.yaw); car.frozen = true; carVisual.update(0, car, 1, input, simTime);
-    boat.reset(m.pierEnd.x, m.pierEnd.z, m.pierEnd.yaw); boatVisual.root.visible = true; G.boating = true;
-    rig.setMode('chase'); rig.snapTo(boat); ui.hideCard(); ui.showSwapPrompt(null);
-    audio.click(); ui.toast('Welcome aboard. W/S throttle, A/D rudder, C changes view. Return to the pier and press B to get back to your car.', 6);
-  }
-  function exitBoat() {
-    if (!G.boating) return; const m = ctx.marina;
-    boat.reset(m.pierEnd.x, m.pierEnd.z, m.pierEnd.yaw); boatVisual.root.visible = false; G.boating = false;
-    car.frozen = false; rig.setMode('chase'); rig.snapTo(car); audio.click(); ui.toast('Back on dry land.', 3);
-  }
-  function updateBoatPrompt() {
-    const m = ctx.marina;
-    if (G.boating) { const d = Math.hypot(boat.x - m.pierEnd.x, boat.z - m.pierEnd.z); ui.showBoatPrompt(d < 12 && Math.abs(boat.speed) * 3.6 < 8 ? 'Dock and return to your car?' : null, 'Dock · B'); }
-    else { const d = Math.hypot(car.x - m.gate.x, car.z - m.gate.z); ui.showBoatPrompt(d < 14 && Math.abs(car.speed) * 3.6 < 8 ? 'Take a motor boat out on the lake?' : null, 'Yes · B'); }
-  }
-  input.on('boat', () => { if (G.phase !== 'drive' || G.overlay) return; if (G.boating) { if (Math.hypot(boat.x - ctx.marina.pierEnd.x, boat.z - ctx.marina.pierEnd.z) < 12) exitBoat(); else ui.toast('Return to the marina pier to dock.', 3); } else if (Math.hypot(car.x - ctx.marina.gate.x, car.z - ctx.marina.gate.z) < 14) enterBoat(); });
+  // Charter plane: parked on the apron until boarded at the hangar or chosen in Settings.
+  const plane = new PlaneModel(world, colliders, ctx); plane.isPlane = true; plane.assist = settings.get('flightAssist');
+  const planeVisual = new PlaneVisual(scene, ctx); plane.reset(ctx.airstrip.apron.x, ctx.airstrip.apron.z, ctx.airstrip.apron.yaw); planeVisual.root.visible = true; planeVisual.update(0, plane, 1, input, 0);
+  const G = { boating: false, flying: false, phase: 'title', titleT: 0, swoopT: 0, paused: false, overlay: null, resumeCount: 0, lakeSeq: null, nearestTimer: 0, stillTimer: 0, autoQ: { t: 0, samples: 0, sum: 0, done: qualityName !== 'medium' || settings.get('quality') !== 'auto' } };
+  const vehicles = new Vehicles({ G, ctx, world, car, carVisual, boat, boatVisual, plane, planeVisual, rig, ui, audio, input, settings });
+  const veh = () => vehicles.active;
+  const enterBoat = () => vehicles.enterBoat(), exitBoat = () => vehicles.exitBoat(), enterPlane = (o) => vehicles.enterPlane(o), exitPlane = (o) => vehicles.exitPlane(o);
+  input.on('boat', () => { if (G.phase !== 'drive' || G.overlay || G.flying) return; if (G.boating) { if (Math.hypot(boat.x - ctx.marina.pierEnd.x, boat.z - ctx.marina.pierEnd.z) < 12) exitBoat(); else ui.toast('Return to the marina pier to dock.', 3); } else if (Math.hypot(car.x - ctx.marina.gate.x, car.z - ctx.marina.gate.z) < 14) enterBoat(); });
   $('boat-btn').onclick = () => { if (G.boating) exitBoat(); else enterBoat(); };
+  input.on('fly', () => { if (G.phase === 'drive' && !G.overlay) vehicles.onFlyKey(); });
+  $('fly-prompt-btn').onclick = () => vehicles.onFlyKey();
+  input.on('flaps', () => { if (G.phase === 'drive' && !G.overlay && G.flying) { const f = plane.cycleFlaps(); ui.toast(f ? `Flaps ${f}°` : 'Flaps up', 1.5); audio.click(); } });
   input.on('swap', () => { if (G.phase === 'drive' && !G.overlay) swap.swap(); });
   $('swap-btn').onclick = () => swap.swap();
   const minimap = new Minimap(world, $('minimap'), $('bigmap-canvas'));
@@ -124,14 +123,13 @@ async function boot() {
 
   // ---------------------------------------------------------------- state
   let simTime = 0, lastNearestPick = null;
-  const G = { boating: false, phase: 'title', titleT: 0, swoopT: 0, paused: false, overlay: null, resumeCount: 0, lakeSeq: null, nearestTimer: 0, stillTimer: 0, autoQ: { t: 0, samples: 0, sum: 0, done: qualityName !== 'medium' || settings.get('quality') !== 'auto' } };
   const gateStart = () => { car.reset(CONFIG.world.gate.x - 6, CONFIG.world.gate.y - 14, 0); };
   gateStart();
   const at = new URLSearchParams(location.search).get('at');
   if (at && world.byId.get(at)) teleportTo(world.byId.get(at));
 
   function teleportTo(plot) {
-    if (G.boating) exitBoat();
+    if (G.boating) exitBoat(); if (G.flying) exitPlane({ silent: true });
     // Prefer the road the plot faces (its street), so the car lands in front of it.
     const pl = plot.road ? placeOnRoad(plot.road, plot.cx, plot.cy) : roadPlacement(world, plot.cx, plot.cy);
     // Face along the road towards the plot's side.
@@ -168,7 +166,7 @@ async function boot() {
     if (name === 'missions') renderMissionList();
     if (name === 'settings') syncSettingsUI();
     if (name === 'teleport') { $('tp-input').value = ''; renderTeleportList(''); setTimeout(() => $('tp-input').focus(), 30); }
-    if (name === 'bigmap') minimap.drawBig(car, missions.active ? missions.active.rings.filter((r, i) => !missions.done.has(i)) : [], missions.target());
+    if (name === 'bigmap') minimap.drawBig(veh(), missions.active ? missions.active.rings.filter((r, i) => !missions.done.has(i)) : [], missions.target());
   }
   function closeOverlay() {
     if (!G.overlay) return;
@@ -181,7 +179,8 @@ async function boot() {
       const row = document.createElement('div'); row.className = 'mission-row';
       const best = m.timed && settings.get('bestLap') ? ` · best ${fmtTime(settings.get('bestLap'))}` : '';
       row.innerHTML = `<div><b>${m.name}${missions.active === m ? ' (active)' : ''}</b><span>${m.desc}${best}</span></div>`;
-      const b = document.createElement('button'); b.className = 'btn small gold'; b.textContent = 'Start'; b.onclick = () => { audio.click(); if (G.phase !== 'drive') startDrive(); missions.start(m.id); closeOverlay(); }; row.appendChild(b); list.appendChild(row);
+      const b = document.createElement('button'); b.className = 'btn small gold'; b.textContent = m.plane && !G.flying ? 'Needs the plane' : 'Start';
+      b.onclick = () => { audio.click(); if (m.plane && !G.flying) { ui.toast('Board the charter plane first: Settings → Vehicle → Charter plane, or drive to GVP Airstrip.', 5); return; } if (G.phase !== 'drive') startDrive(); missions.start(m.id); closeOverlay(); }; row.appendChild(b); list.appendChild(row);
     }
   }
   const searchable = world.plots.map((p) => ({ p, key: `${p.kind} ${p.n || ''} ${p.id} ${p.name || ''}`.toLowerCase() }));
@@ -209,6 +208,7 @@ async function boot() {
   function syncSettingsUI() {
     $('s-quality').value = settings.get('quality'); $('s-tod').value = ctx.lighting.name; $('s-master').value = settings.get('master'); $('s-engine').value = settings.get('engine'); $('s-ambience').value = settings.get('ambience');
     $('s-chase').value = settings.get('chaseDistance'); $('s-invert').checked = settings.get('invertSteer'); $('s-minimap').value = settings.get('minimapMode');
+    $('s-vehicle').value = G.flying ? 'plane' : 'car'; $('s-assist').value = settings.get('flightAssist'); $('s-pitch').value = settings.get('pitchMode');
   }
   $('s-quality').onchange = (e) => settings.set('quality', e.target.value);
   $('s-tod').onchange = (e) => { settings.set('timeOfDay', e.target.value); ctx.lighting.set(e.target.value); };
@@ -216,13 +216,16 @@ async function boot() {
   $('s-chase').onchange = (e) => settings.set('chaseDistance', e.target.value);
   $('s-invert').onchange = (e) => { settings.set('invertSteer', e.target.checked); input.invertSteer = e.target.checked; };
   $('s-minimap').onchange = (e) => { settings.set('minimapMode', e.target.value); minimap.mode = e.target.value; };
+  $('s-vehicle').onchange = (e) => { const want = e.target.value; if (G.phase !== 'drive') { settings.set('vehicle', want); return; } if (want === 'plane') enterPlane(); else exitPlane(); };
+  $('s-assist').onchange = (e) => { settings.set('flightAssist', e.target.value); plane.assist = e.target.value; };
+  $('s-pitch').onchange = (e) => { settings.set('pitchMode', e.target.value); input.invertPitch = e.target.value === 'arcade'; };
   document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
     const act = b.dataset.act; audio.click();
     if (act === 'resume' || act === 'close') closeOverlay();
     if (act === 'missions') openOverlay('missions');
     if (act === 'settings') openOverlay('settings');
     if (act === 'controls') { closeOverlay(); ui.showControls(8); }
-    if (act === 'restart') { closeOverlay(); missions.abandon(); gateStart(); rig.snapTo(car); ui.hideCard(); }
+    if (act === 'restart') { closeOverlay(); missions.abandon(); if (G.flying) exitPlane({ silent: true }); if (G.boating) exitBoat(); clearWaypoint(); gateStart(); rig.snapTo(car); ui.hideCard(); }
     if (act === 'abandon') { missions.abandon(); ui.setWrongWay(false); renderMissionList(); }
     if (act === 'driveon') ui.hideComplete();
     if (act === 'next') { ui.hideComplete(); openOverlay('missions'); }
@@ -234,19 +237,24 @@ async function boot() {
   $('bigmap-canvas').addEventListener('click', (e) => {
     const p = minimap.bigToWorld(e.clientX, e.clientY); if (!p) return;
     minimap.mark = p; const near = world.plotsNear(p.x, p.z, 25)[0];
-    $('fly-text').textContent = `${world.zoneOf(p.x, p.z)}${near ? ` · near ${near.plot.kind}${near.plot.n ? ' ' + near.plot.n : ''}` : ''} · ${Math.round(Math.hypot(p.x - car.x, p.z - car.z))} m away`;
+    const vv = veh(); $('fly-text').textContent = `${world.zoneOf(p.x, p.z)}${near ? ` · near ${near.plot.kind}${near.plot.n ? ' ' + near.plot.n : ''}` : ''} · ${Math.round(Math.hypot(p.x - vv.x, p.z - vv.z))} m away`; $('fly-btn').textContent = G.flying ? 'Set waypoint' : 'Fly there';
     $('fly-bar').classList.remove('hidden');
-    minimap.drawBig(car, missions.active ? missions.active.rings.filter((r, i) => !missions.done.has(i)) : [], missions.target());
+    minimap.drawBig(veh(), missions.active ? missions.active.rings.filter((r, i) => !missions.done.has(i)) : [], missions.target());
   });
   $('fly-btn').onclick = () => { const p = minimap.mark; if (!p) return; closeOverlay(); startFlight(p.x, p.z); audio.click(); };
+  // Waypoint beam for the plane (the map's button becomes "Set waypoint" in the air).
+  const wpBeam = new THREE.Mesh(new THREE.CylinderGeometry(3, 6, 400, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0xffd35a, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })); wpBeam.position.y = 200; wpBeam.visible = false; scene.add(wpBeam);
+  function setWaypoint(x, z) { G.waypoint = { x, z, y: 0 }; wpBeam.position.set(x, 200, z); wpBeam.visible = true; ui.waypoint = G.waypoint; ui.toast(`Waypoint set: ${world.zoneOf(x, z)}. Follow the arrow.`, 4); }
+  function clearWaypoint() { G.waypoint = null; wpBeam.visible = false; ui.waypoint = null; }
   function startFlight(x, z) {
+    if (G.flying) { setWaypoint(x, z); minimap.mark = null; $('fly-bar').classList.add('hidden'); return; }
     if (G.boating) exitBoat();
     const pl = roadPlacement(world, x, z);
     const dx = x - pl.x, dz = z - pl.y; let yaw = pl.yaw;
     if (pl.road.horizontal) yaw = dx >= 0 ? Math.PI / 2 : -Math.PI / 2; else yaw = dz >= 0 ? Math.PI : 0;
     if (Math.abs(dx) < 15 && Math.abs(dz) < 15) yaw = pl.yaw;
     const dist = Math.hypot(pl.x - car.x, pl.y - car.z);
-    G.flight = { t: 0, dur: Math.min(4.5, 1.4 + dist / 700), from: { x: car.x, z: car.z }, to: { x: pl.x, z: pl.y, yaw }, camFrom: camera.position.clone() };
+    G.flyTo = { t: 0, dur: Math.min(4.5, 1.4 + dist / 700), from: { x: car.x, z: car.z }, to: { x: pl.x, z: pl.y, yaw }, camFrom: camera.position.clone() };
     car.frozen = true; carVisual.root.visible = false; ui.hideCard(); minimap.mark = null; $('fly-bar').classList.add('hidden');
   }
   $('tod-btn').onclick = () => cycleTod(); $('mute-btn').onclick = () => audio.setMuted(!audio.muted); $('pause-btn').onclick = () => openOverlay('pause');
@@ -255,7 +263,7 @@ async function boot() {
 
   // ---------------------------------------------------------------- actions
   input.on('camera', () => { if (G.phase === 'drive' && !G.overlay) { rig.cycle(); audio.click(); } });
-  input.on('reset', () => { if (G.phase !== 'drive' || G.overlay) return; if (G.boating) { boat.reset(ctx.marina.pierEnd.x, ctx.marina.pierEnd.z, ctx.marina.pierEnd.yaw); rig.snapTo(boat); } else resetToRoad(); });
+  input.on('reset', () => { if (G.phase !== 'drive' || G.overlay) return; if (G.flying) { vehicles.respawnPlane('Back on the runway threshold.'); return; } if (G.boating) { boat.reset(ctx.marina.pierEnd.x, ctx.marina.pierEnd.z, ctx.marina.pierEnd.yaw); rig.snapTo(boat); } else resetToRoad(); });
   input.on('timeOfDay', () => { if (!G.overlay) cycleTod(); });
   input.on('teleport', () => { if (G.phase === 'drive') openOverlay(G.overlay === 'teleport' ? null : 'teleport'); });
   input.on('map', () => { if (G.overlay === 'bigmap') closeOverlay(); else if (G.phase === 'drive') openOverlay('bigmap'); });
@@ -281,17 +289,18 @@ async function boot() {
     closeOverlay();
     audio.unlock(); audio.setAmbience(ctx.lighting.ambience);
     ui.hideTitle(); ui.showHud();
+    if (settings.get('vehicle') === 'plane' && !G.flying) enterPlane({ silent: true });
     G.phase = 'swoop'; G.swoopT = 0; G.swoopFrom = camera.position.clone(); G.swoopLook = new THREE.Vector3(1500, 0, 1500);
     input.enabled = false;
   }
-  function finishSwoop() { G.phase = 'drive'; input.enabled = true; rig.snapTo(car); ui.showControls(CONFIG.ui.controlsCardSeconds); ui.toast('Welcome to GVP Smart Village. Drive anywhere. Press Tab for missions, T to find a plot.', 6); }
+  function finishSwoop() { G.phase = 'drive'; input.enabled = true; rig.snapTo(veh()); ui.showControls(G.flying ? 9 : CONFIG.ui.controlsCardSeconds); ui.toast(G.flying ? 'Charter plane on runway 09. Hold W or Shift for full power, pull back with ↓ at 100 km/h. Press M to set a waypoint.' : 'Welcome to GVP Smart Village. Drive anywhere. Press Tab for missions, T to find a plot.', 7); }
 
   // ---------------------------------------------------------------- sim
   function sim(dt) {
     if (G.phase !== 'drive' || G.resumeCount > 0) return;
     car.handbrakeOn = input.handbrake;
     if (G.lakeSeq) { car.frozen = true; return; }
-    if (G.boating) boat.step(dt, input); else car.step(dt, input);
+    if (G.flying) plane.step(dt, input); else if (G.boating) boat.step(dt, input); else car.step(dt, input);
     missions.update(dt, veh());
   }
   // ---------------------------------------------------------------- render
@@ -304,9 +313,9 @@ async function boot() {
       ctx.lighting.update(dt, { x: camera.position.x, z: camera.position.z });
     } else if (G.phase === 'swoop') {
       G.swoopT += dt; const t = clamp(G.swoopT / 2.5, 0, 1); const e = t * t * (3 - 2 * t);
-      rig.snapTo(car); const target = camera.position.clone(); const look = new THREE.Vector3(car.x, 1.1, car.z - 4);
+      const sv = veh(); rig.snapTo(sv); const target = camera.position.clone(); const look = new THREE.Vector3(sv.x, 1.1, sv.z - 4);
       camera.position.lerpVectors(G.swoopFrom, target, e); camera.up.set(0, 1, 0); camera.lookAt(G.swoopLook.clone().lerp(look, e)); camera.fov = lerp(55, 60, e); camera.updateProjectionMatrix();
-      ctx.lighting.update(dt, car);
+      ctx.lighting.update(dt, veh());
       if (t >= 1) finishSwoop();
     } else {
       // Resume countdown after a hidden tab.
@@ -317,32 +326,42 @@ async function boot() {
         if (ev.type === 'hedge') audio.rustle();
         if (ev.type === 'boost') audio.boostStart();
         if (ev.type === 'stuckReset') { resetToRoad(); ui.toast('Unstuck: back on the road.', 2); }
+        if (ev.type === 'landing') { audio.squeal(); planeVisual.touchdown(ev.sink); rig.addShake(Math.min(0.5, ev.sink * 0.1)); const rating = ev.sink < 1 ? 'Greaser' : ev.sink < 2.5 ? 'Firm' : 'Hard'; const onRunway = Math.abs(plane.z - ctx.airstrip.runway.z) < 14 && plane.x > ctx.airstrip.runway.x0 - 30 && plane.x < ctx.airstrip.runway.x1 + 30; ui.toast(`${rating} landing · ${ev.sink.toFixed(1)} m/s${onRunway ? ' on the runway' : ' off-airport'}. Space brakes, taxi to the apron and press F to park.`, 5); }
+        if (ev.type === 'crash') vehicles.crash(ev.reason);
+        if (ev.type === 'liftoff' && vehicles.firstFlight) { vehicles.firstFlight = false; ui.toast('Airborne. Ease off the pull, W/S set power, ← → bank to turn. The whole village is north of the wall.', 6); }
+        if (ev.type === 'stall') rig.addShake(0.3);
+        if (ev.type === 'boundary') ui.toast('You are leaving the area around GVP Smart Village. Turn back within 10 seconds.', 5);
+        if (ev.type === 'boundaryTurn') ui.toast('Autopilot: turning back towards the village.', 4);
         if (ev.type === 'lake' && !G.lakeSeq) { G.lakeSeq = { t: 0 }; audio.splash(); rig.addShake(0.6); $('splash').classList.add('show'); ui.toast('Splash! Fished out onto the joggers’ track.', 4); }
       }
       if (G.lakeSeq) { G.lakeSeq.t += dt; carVisual.root.position.y = -Math.min(1.5, G.lakeSeq.t * 2); if (G.lakeSeq.t > 0.9 && !G.lakeSeq.moved) { G.lakeSeq.moved = true; respawnOnTrack(); $('splash').classList.remove('show'); } if (G.lakeSeq.t > 1.4) { G.lakeSeq = null; car.frozen = false; carVisual.root.position.y = 0; } }
-      if (G.flight) {
-        const f = G.flight; f.t = Math.min(f.dur, f.t + dt); const u = f.t / f.dur, e = u * u * (3 - 2 * u);
+      if (G.flyTo) {
+        const f = G.flyTo; f.t = Math.min(f.dur, f.t + dt); const u = f.t / f.dur, e = u * u * (3 - 2 * u);
         const gx = lerp(f.from.x, f.to.x, e), gz = lerp(f.from.z, f.to.z, e);
         const h = 12 + Math.sin(Math.PI * u) * Math.min(320, 60 + Math.hypot(f.to.x - f.from.x, f.to.z - f.from.z) * 0.35);
         const fwd = new THREE.Vector3(Math.sin(f.to.yaw), 0, -Math.cos(f.to.yaw));
         camera.position.set(gx - fwd.x * 8 * (1 - u) - fwd.x * 8, h, gz - fwd.z * 8 * (1 - u) - fwd.z * 8); camera.up.set(0, 1, 0); camera.lookAt(gx + fwd.x * 6, 1, gz + fwd.z * 6);
-        if (f.t >= f.dur) { car.reset(f.to.x, f.to.z, f.to.yaw); car.frozen = false; carVisual.root.visible = true; rig.snapTo(car); G.flight = null; ui.toast(`Landed in ${world.zoneOf(car.x, car.z)}.`, 3); }
+        if (f.t >= f.dur) { car.reset(f.to.x, f.to.z, f.to.yaw); car.frozen = false; carVisual.root.visible = true; rig.snapTo(car); G.flyTo = null; ui.toast(`Landed in ${world.zoneOf(car.x, car.z)}.`, 3); }
       }
       const v = veh();
+      vehicles.update(dt);
       carVisual.update(dt, car, alpha, input, simTime);
       if (G.boating) boatVisual.update(dt, boat, alpha, input, simTime);
-      if (!G.flight) rig.update(dt, v, alpha, input);
-      carVisual.setBodyVisible(G.boating || rig.mode !== 'hood');
+      planeVisual.update(dt, plane, G.flying ? alpha : 1, input, simTime);
+      if (!G.flyTo) rig.update(dt, v, alpha, input);
+      carVisual.setBodyVisible(G.boating || G.flying || rig.mode !== 'hood');
       if (G.boating) boatVisual.setBodyVisible(rig.mode !== 'hood');
+      planeVisual.setBodyVisible(!(G.flying && rig.mode === 'cockpit'));
+      if (G.waypoint && G.flying && Math.hypot(plane.x - G.waypoint.x, plane.z - G.waypoint.z) < 60) { clearWaypoint(); audio.chime(); ui.toast('Waypoint reached.', 3); }
       ctx.lighting.update(dt, v);
-      carVisual.setNight(ctx.lighting.isNight); boatVisual.setNight(ctx.lighting.isNight);
+      carVisual.setNight(ctx.lighting.isNight); boatVisual.setNight(ctx.lighting.isNight); planeVisual.setNight(ctx.lighting.isNight);
       audio.setAmbience(ctx.lighting.ambience);
-      audio.update(dt, { speed: v.speed, throttle: input.throttle, boosting: v.boosting, offroad: v.offroad, hedge: v.hedge, slip: v.telemetry.slip });
+      audio.update(dt, { mode: G.flying ? 'plane' : 'car', speed: v.speed, throttle: input.throttle, boosting: v.boosting, offroad: v.offroad, hedge: v.hedge, slip: v.telemetry.slip, rpm: plane.rpm, onGround: plane.onGround, stalled: plane.stalled });
       ui.update(dt, v, world, missions, ctx.lighting, rig.mode);
       minimap.draw(v, missions.active ? missions.active.rings.filter((r, i) => !missions.done.has(i)) : [], missions.target());
       // Nearest plot every 0.25 s; card after 1 s stopped within 20 m.
       G.nearestTimer += dt;
-      if (G.nearestTimer > 0.25) { G.nearestTimer = 0; lastNearestPick = ui.updateNearest(v, world); if (!G.boating) swap.update(); updateBoatPrompt(); }
+      if (G.nearestTimer > 0.25) { G.nearestTimer = 0; lastNearestPick = ui.updateNearest(v, world); if (!G.boating && !G.flying) swap.update(); else ui.showSwapPrompt(null); vehicles.updatePrompts(); }
       const stopped = Math.abs(v.speed) < CONFIG.ui.plotCardSpeed;
       G.stillTimer = stopped ? G.stillTimer + dt : 0;
       if (input.throttle > 0.5 && ui.cardPlot) ui.hideCard();
@@ -352,7 +371,7 @@ async function boot() {
       if (!G.autoQ.done) { G.autoQ.t += dt; if (G.autoQ.t > 2) { G.autoQ.sum += 1 / Math.max(dt, 1e-3); G.autoQ.samples++; } if (G.autoQ.t > 5) { G.autoQ.done = true; const avg = G.autoQ.sum / G.autoQ.samples; console.log('[auto-quality] avg fps', avg.toFixed(1)); if (avg < 45) { settings.set('quality', 'low'); renderer.shadowMap.enabled = false; ctx.lighting.sun.castShadow = false; renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25)); ui.toast('Performance: switched to Low quality (saved for next time).', 4); } } }
       if (!$('debug').classList.contains('hidden')) {
         const info = renderer.info;
-        ui.debug([`fps ${loop.fps.toFixed(0)}  frame ${(dt * 1000).toFixed(1)} ms  steps ${loop.stepsThisFrame}`, `draw calls ${info.render.calls}  tris ${(info.render.triangles / 1e6).toFixed(2)} M`, `pos ${car.x.toFixed(1)}, ${car.z.toFixed(1)}  yaw ${(car.yaw * 57.3).toFixed(0)}°`, `speed ${(car.speed * KMH).toFixed(1)} km/h  slip ${(car.telemetry.slip * 30).toFixed(1)}°  latG ${car.telemetry.latG.toFixed(1)}`, `steer ${(car.steer * 57.3).toFixed(1)}° / max ${(car.steerMax * 57.3).toFixed(0)}°  boost ${(car.boostCharge * 100).toFixed(0)}%`, `offroad ${car.offroad}  hedge ${!!car.hedge}  stuck ${car.stuck.toFixed(2)}`, `zone ${world.zoneOf(car.x, car.z)}  nearest ${lastNearestPick ? lastNearestPick.plot.id : '-'}`, `colliders ${colliders.list.length}  trees ${ctx.treeCount}  shrubs ${ctx.shrubCount}  parked ${ctx.parkedCars || 0}  lights ${JSON.stringify(ctx.lightCounts || {})}`, `counts farms ${world.L.farms.length} villas ${world.L.villas.length} th ${world.L.townhouses.length} com ${world.L.commercial.length} parks ${world.L.parks.length}`]);
+        ui.debug([`fps ${loop.fps.toFixed(0)}  frame ${(dt * 1000).toFixed(1)} ms  steps ${loop.stepsThisFrame}`, `draw calls ${info.render.calls}  tris ${(info.render.triangles / 1e6).toFixed(2)} M`, `pos ${car.x.toFixed(1)}, ${car.z.toFixed(1)}  yaw ${(car.yaw * 57.3).toFixed(0)}°`, `speed ${(car.speed * KMH).toFixed(1)} km/h  slip ${(car.telemetry.slip * 30).toFixed(1)}°  latG ${car.telemetry.latG.toFixed(1)}`, `steer ${(car.steer * 57.3).toFixed(1)}° / max ${(car.steerMax * 57.3).toFixed(0)}°  boost ${(car.boostCharge * 100).toFixed(0)}%`, `offroad ${car.offroad}  hedge ${!!car.hedge}  stuck ${car.stuck.toFixed(2)}`, `plane alt ${plane.y.toFixed(1)}  V ${(plane.speed * KMH).toFixed(0)} km/h  pitch ${(plane.pitch * 57.3).toFixed(1)}  roll ${(plane.roll * 57.3).toFixed(1)}  alpha ${(plane.alpha * 57.3).toFixed(1)}  thr ${(plane.throttle * 100).toFixed(0)}%  gnd ${plane.onGround}  stall ${plane.stalled}`, `zone ${world.zoneOf(car.x, car.z)}  nearest ${lastNearestPick ? lastNearestPick.plot.id : '-'}`, `colliders ${colliders.list.length}  trees ${ctx.treeCount}  shrubs ${ctx.shrubCount}  parked ${ctx.parkedCars || 0}  lights ${JSON.stringify(ctx.lightCounts || {})}`, `counts farms ${world.L.farms.length} villas ${world.L.villas.length} th ${world.L.townhouses.length} com ${world.L.commercial.length} parks ${world.L.parks.length}`]);
       }
     }
     for (const fn of ctx.animate) fn(dt, simTime);
@@ -362,6 +381,6 @@ async function boot() {
   const loop = new Loop(sim, render);
   ui.hideLoading(); ui.showTitle(settings.get('bestLap'));
   loop.start();
-  window.__svd = { car, world, ctx, rig, missions, settings, teleportTo, startDrive, finishSwoop, G, carVisual, loop, swap, boat, boatVisual, enterBoat, exitBoat };
+  window.__svd = { car, world, ctx, rig, missions, settings, teleportTo, startDrive, finishSwoop, G, carVisual, loop, swap, boat, boatVisual, enterBoat, exitBoat, plane, planeVisual, enterPlane, exitPlane, vehicles, setWaypoint, input, camera };
 }
 boot().catch((e) => { console.error('[boot] ' + (e && e.stack ? e.stack : String(e))); ui.fatal((e && (e.message || e.stack)) || String(e)); });

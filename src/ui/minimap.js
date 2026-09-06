@@ -50,7 +50,7 @@ export class Minimap {
   }
   draw(car, rings, target) {
     const c = this.canvas; const g = c.getContext('2d'); const W = c.width, H = c.height;
-    const view = this.levels[this.level]; // metres across the minimap
+    const view = Math.max(this.levels[this.level], car.y ? Math.min(3200, car.y * 2.5) : 0); // metres across the minimap; wider with altitude
     const k = W / view; const kb = this.base.width / 3000;
     g.save(); g.clearRect(0, 0, W, H);
     g.beginPath(); g.arc(W / 2, H / 2, W / 2 - 2, 0, Math.PI * 2); g.clip();

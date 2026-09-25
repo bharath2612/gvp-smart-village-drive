@@ -125,5 +125,6 @@ export function buildLights(ctx) {
   scene.add(instancedChunks(disc, streetMat, gate, { name: 'light-pools-landmarks', chunk: 1000 }));
   // Airstrip: runway edge, apron masts, hangar interior.
   if (ctx.airstrip) scene.add(instancedChunks(disc, streetMat, ctx.airstrip.pools.map((q) => ({ x: q.x, z: q.z, sx: q.sx, sy: 1, sz: q.sz })), { name: 'light-pools-airstrip', chunk: 1000 }));
+  if (ctx.university) scene.add(instancedChunks(disc, facadeMat, ctx.university.pools.map(q => ({ ...q, sy: 1 })), { name: 'light-pools-university', chunk: 400 }));
   ctx.lightCounts = { street: street.length, garden: gardenPosts.length, park: parkPosts.length };
 }

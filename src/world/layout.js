@@ -1,6 +1,7 @@
 // Loads layout.json (single source of truth), validates counts, and derives everything the game needs:
 // plot index, facing rules, road lookup, zone names. Colliders are registered by the world builders.
 import { CONFIG } from '../config.js';
+import { projectPath } from './university-plan.js';
 import { rectCenter, distToRect } from '../util/math.js';
 
 export async function loadLayout() {
@@ -164,6 +165,11 @@ function derive(L) {
 export function roadPlacement(world, x, y, prefer) {
   const { road } = world.nearestRoad(x, y);
   const r = road;
+  if (r.points) {
+    const p = projectPath(r, x, y);
+    const yaw = prefer !== undefined && Math.cos(prefer - p.yaw) < 0 ? p.yaw + Math.PI : p.yaw;
+    return { x: p.x, y: p.z, yaw, road: r };
+  }
   let px, py, yaw;
   if (r.horizontal) {
     py = r.y + r.h / 2; px = Math.min(Math.max(x, r.x + 10), r.x + r.w - 10);

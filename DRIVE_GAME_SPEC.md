@@ -521,3 +521,17 @@ Purpose: catch the ways this stops being fun or trustworthy before a client sees
 
 ## B.10 Release gate
 Ship only when: B1 all pass; B2 majority pass on all three testers; B3, B5, B8.5 and B9 have zero failures; B2.7 and B7.5 measured; a 3-minute screen recording of a full boundary lap at 60 fps is attached to the release notes.
+
+
+## 20. University expansion (25 September 2026)
+
+This section supersedes the original inside-the-gate car spawn. User confirmed a campus on **all four sides** of the village wall, connected by a loop road, with **formal stone architecture, courtyards and landscaped quadrangles**. The original drawing only labels a southern university; this expansion is game design and does not change measured `layout.json`.
+
+- `src/world/university-plan.js`: independent layout and navigation data, 18 quadrangles, ~15.2 km rounded loop, campus entrance boulevard, village/airstrip links, and an east sports-ground drive. The campus and map extend from -720 to 3720 m. All college driveways join the loop; central court access stays clear.
+- `src/world/university.js`: four instanced building archetypes with arched windows, slate roofs, cornices, colonnades and porticoes. The Great Library has a copper-coloured dome; Convocation Hall and other halls have clock towers. Courtyard lawns, reflecting basins, benches, wall-side greenery, avenue trees, lanterns, a sports lawn and monument entrance complete the grounds.
+- Car starts outside at Convocation Hall (1370, 3490), facing its forecourt. Restart returns here. Existing explicit plot URL spawns and selected-plane starts still work.
+- Existing runway, apron, hangar and aircraft remain in place. Campus buildings/trees/lamp posts avoid the runway and its east/west approach corridor. Ground roads cross the approach well beyond the runway fence; no campus road crosses the runway itself.
+- Full map includes the campus, runway and entrances. Map clicks support negative/outside coordinates. Road resets, fast travel, zone names and switching from flight to car use campus roads. The aircraft's return point is captured before resetting it to the apron.
+- Campus lighting follows day/sunset/night presets using shared emissive materials and ground pools, with no additional real-time point lights. Existing GLBs and procedural materials are reused; no asset pack downloads.
+- Curbs/walkways are split into spatial chunks; trees have a distant stand-in; window/trim detail is culled at distance. The camera far plane follows visible fog distance at road level and expands with altitude; the sky stays inside the frustum.
+- Campus buildings have collision heights for aircraft. Courtyards are accessible to cars; building interiors are not modelled.

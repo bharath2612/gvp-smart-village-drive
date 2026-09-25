@@ -32,6 +32,7 @@ import { PlaneModel } from './plane/plane.js';
 import { PlaneVisual } from './plane/visual.js';
 import { buildAirstrip } from './world/airstrip.js';
 import { buildHorizon } from './world/horizon.js';
+import { buildUniversity } from './world/university.js';
 import { Vehicles } from './game/vehicles.js';
 import { UI } from './ui/hud.js';
 import { SettingsScreen } from './ui/settingsScreen.js';
@@ -86,6 +87,7 @@ async function boot() {
     ['Filling the lake…', () => buildLake(ctx)],
     ['Planting trees, hedges and crops…', () => buildVegetation(ctx)],
     ['Parking cars, planting flowers…', () => buildProps(ctx)],
+    ['Building the university quadrangles and campus loop…', () => buildUniversity(ctx)],
     ['Wiring street, garden and stadium lights…', () => buildLights(ctx)],
     ['Lighting…', () => buildLighting(ctx)],
   ];
@@ -93,7 +95,7 @@ async function boot() {
   for (let i = 0; i < steps.length; i++) { ui.setLoading(0.15 + (i / steps.length) * 0.8, steps[i][0]); await nextFrame(); steps[i][1](); }
   console.log(`[world] built in ${Math.round(performance.now() - t0)} ms, colliders ${colliders.list.length}, trees ${ctx.treeCount}, crop shrubs ${ctx.shrubCount}`);
   // Paved (non-slowing) areas besides roads.
-  ctx.pavedRects = [...world.L.commercial, ...world.L.amenities.filter((a) => ['parking', 'agro', 'fire-station', 'wtp', 'school', 'stadium'].includes(a.id)), ...world.L.parks.map((p) => ({ x: p.x, y: p.y + p.h / 2 - 2, w: p.w, h: 4 })), ...ctx.airstrip.paved];
+  ctx.pavedRects = [...world.L.commercial, ...world.L.amenities.filter((a) => ['parking', 'agro', 'fire-station', 'wtp', 'school', 'stadium'].includes(a.id)), ...world.L.parks.map((p) => ({ x: p.x, y: p.y + p.h / 2 - 2, w: p.w, h: 4 })), ...ctx.airstrip.paved, ...ctx.university.paved];
 
   const input = new Input(); input.invertSteer = settings.get('invertSteer'); input.invertPitch = settings.get('pitchMode') === 'arcade';
   const car = new CarModel(world, colliders, ctx);
@@ -124,7 +126,7 @@ async function boot() {
 
   // ---------------------------------------------------------------- state
   let simTime = 0, lastNearestPick = null;
-  const gateStart = () => { car.reset(CONFIG.world.gate.x - 6, CONFIG.world.gate.y - 14, 0); };
+  const gateStart = () => { const p = ctx.university.spawn; car.reset(p.x, p.z, p.yaw); };
   gateStart();
   const at = new URLSearchParams(location.search).get('at');
   if (at && world.byId.get(at)) teleportTo(world.byId.get(at));
@@ -136,7 +138,7 @@ async function boot() {
     // Face along the road towards the plot's side.
     const dx = plot.cx - pl.x, dz = plot.cy - pl.y;
     let yaw = pl.yaw; const f = { x: Math.sin(yaw), z: -Math.cos(yaw) };
-    if (pl.road.horizontal) yaw = dx >= 0 ? Math.PI / 2 : -Math.PI / 2; else yaw = dz >= 0 ? Math.PI : 0;
+    if (pl.road.points) yaw = pl.yaw; else if (pl.road.horizontal) yaw = dx >= 0 ? Math.PI / 2 : -Math.PI / 2; else yaw = dz >= 0 ? Math.PI : 0;
     if (Math.abs(dx) < 15 && Math.abs(dz) < 15) yaw = pl.yaw;
     car.reset(pl.x, pl.y, yaw); rig.snapTo(car); ui.hideCard();
     ui.lastNearest = plot; lastNearestPick = { plot, dist: 0 }; G.stillTimer = CONFIG.ui.plotCardDelay;
@@ -258,7 +260,7 @@ async function boot() {
     if (G.boating) exitBoat();
     const pl = roadPlacement(world, x, z);
     const dx = x - pl.x, dz = z - pl.y; let yaw = pl.yaw;
-    if (pl.road.horizontal) yaw = dx >= 0 ? Math.PI / 2 : -Math.PI / 2; else yaw = dz >= 0 ? Math.PI : 0;
+    if (pl.road.points) yaw = pl.yaw; else if (pl.road.horizontal) yaw = dx >= 0 ? Math.PI / 2 : -Math.PI / 2; else yaw = dz >= 0 ? Math.PI : 0;
     if (Math.abs(dx) < 15 && Math.abs(dz) < 15) yaw = pl.yaw;
     const dist = Math.hypot(pl.x - car.x, pl.y - car.z);
     G.flyTo = { t: 0, dur: Math.min(4.5, 1.4 + dist / 700), from: { x: car.x, z: car.z }, to: { x: pl.x, z: pl.y, yaw }, camFrom: camera.position.clone() };
@@ -300,7 +302,7 @@ async function boot() {
     G.phase = 'swoop'; G.swoopT = 0; G.swoopFrom = camera.position.clone(); G.swoopLook = new THREE.Vector3(1500, 0, 1500);
     input.enabled = false;
   }
-  function finishSwoop() { G.phase = 'drive'; input.enabled = true; rig.snapTo(veh()); ui.showControls(G.flying ? 9 : CONFIG.ui.controlsCardSeconds); ui.toast(G.flying ? 'Charter plane on runway 09. Hold W or Shift for full power, pull back with ↓ at 100 km/h. Press M to set a waypoint.' : 'Welcome to GVP Smart Village. Drive anywhere. Press Tab for missions, T to find a plot.', 7); }
+  function finishSwoop() { G.phase = 'drive'; input.enabled = true; rig.snapTo(veh()); ui.showControls(G.flying ? 9 : CONFIG.ui.controlsCardSeconds); ui.toast(G.flying ? 'Charter plane on runway 09. Hold W or Shift for full power, pull back with ↓ at 100 km/h. Press M to set a waypoint.' : 'Welcome to GVP University. Follow the campus loop, or head north to the village and airstrip. M opens the campus map.', 7); }
 
   // ---------------------------------------------------------------- sim
   function sim(dt) {

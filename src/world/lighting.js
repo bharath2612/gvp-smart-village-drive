@@ -12,6 +12,7 @@ export const PRESET_ORDER = ['day', 'sunset', 'night'];
 
 export function buildLighting(ctx) {
   const { scene, renderer } = ctx;
+  const maxCameraFar = ctx.camera?.far || 9000;
   const sun = new THREE.DirectionalLight(0xffffff, 2.5);
   sun.castShadow = ctx.qualityPreset.shadows;
   const R = ctx.qualityPreset.shadowRadius;
@@ -53,6 +54,7 @@ export function buildLighting(ctx) {
     if (ctx.lampHeadMat) ctx.lampHeadMat.emissiveIntensity = mix(a.lamps, b.lamps);
     if (ctx.glassMat) ctx.glassMat.emissiveIntensity = mix(a.windows, b.windows);
     if (ctx.bodyMat) ctx.bodyMat.emissiveIntensity = mix(a.windows, b.windows) * 0.22;
+    if (ctx.universityMats) { const m = ctx.universityMats; m.stone.emissiveIntensity = mix(a.windows, b.windows) * 0.10; m.trim.emissiveIntensity = mix(a.windows, b.windows) * 0.16; m.glass.emissiveIntensity = mix(a.windows, b.windows) * 0.65; }
     if (ctx.templeMat) ctx.templeMat.emissiveIntensity = mix(a.windows, b.windows) * 0.45;
     if (ctx.waterMat) { ctx.waterMat.envMapIntensity = mix(a.water ?? 0.45, b.water ?? 0.45); ctx.waterMat.color.copy(mixColor(a.waterColor ?? 0x0f4f6e, b.waterColor ?? 0x0f4f6e)); }
     if (ctx.templeLightMat) ctx.templeLightMat.emissiveIntensity = mix(a.lamps, b.lamps) * 1.3;
@@ -69,9 +71,12 @@ export function buildLighting(ctx) {
       // Shadow frustum and sky follow the car.
       const d = cur.sunDir; sun.position.set(carPos.x + d.x * 400, d.y * 400, carPos.z + d.z * 400); sun.target.position.set(carPos.x, 0, carPos.z);
       // The sky dome follows the camera (not the car) so the title orbit and swoop never clip it.
-      const cp = ctx.camera ? ctx.camera.position : carPos; sky.position.set(cp.x, 0, cp.z);
+      const cp = ctx.camera ? ctx.camera.position : carPos; sky.position.set(cp.x, cp.y || 0, cp.z);
       // Fog opens up with altitude so the whole site (and the far plain) reads from the air.
       const fa = 1 + Math.min(1400, Math.max(0, cp.y - 20)) / 220; scene.fog.near = cur.fogNear * fa; scene.fog.far = Math.min(7500, cur.fogFar * fa);
+      // Campus views face the entire village. Do not submit invisible geometry beyond the fog.
+      // The far plane opens back out in flight; keep the sky inside it at every altitude.
+      if (ctx.camera) { const far = Math.min(maxCameraFar, Math.ceil((scene.fog.far + 150) / 100) * 100); if (ctx.camera.far !== far) { ctx.camera.far = far; ctx.camera.updateProjectionMatrix(); } sky.scale.setScalar(far * 0.92 / 8000); }
     },
     get name() { return state.target; },
     get isNight() { return cur.night; },

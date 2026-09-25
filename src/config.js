@@ -11,7 +11,7 @@ export const CONFIG = {
     overrideModel: '/models/suv.glb', model: '/models/cars/suv.glb', length: 4.7,
   },
   lodDistance: 380,
-  world: { size: 3000, outside: 700, wallHeight: 6.1, wallThickness: 0.4, gate: { x: 1500, y: 3000 }, plain: 14000, cameraFar: 9000 },
+  world: { size: 3000, outside: 750, wallHeight: 6.1, wallThickness: 0.4, gate: { x: 1500, y: 3000 }, plain: 14000, cameraFar: 9000 },
   // Charter plane: Cessna 172 style trainer. Forces in N, masses in kg, angles in radians unless *Deg.
   plane: {
     mass: 1000, wingArea: 16.2, rho: 1.225,

@@ -19,9 +19,10 @@ export class Vehicles {
     const { G, ctx, car, carVisual, plane, planeVisual, rig, ui, audio, settings, world } = this;
     if (!G.flying) return; const A = ctx.airstrip;
     const nearApron = Math.hypot(plane.x - A.hangarPrompt.x, plane.z - A.hangarPrompt.z) < 45 && plane.onGround;
+    const returnPoint = { x: plane.x, z: plane.z };
     const finish = () => {
       if (nearApron) { plane.reset(A.apron.x, A.apron.z, A.apron.yaw); car.reset(A.park.x, A.park.z, A.park.yaw); }
-      else { plane.reset(A.apron.x, A.apron.z, A.apron.yaw); const pl = roadPlacement(world, Math.min(2990, Math.max(10, plane.x)), Math.min(2990, Math.max(10, plane.z))); car.reset(pl.x, pl.y, pl.yaw); }
+      else { plane.reset(A.apron.x, A.apron.z, A.apron.yaw); const pl = roadPlacement(world, returnPoint.x, returnPoint.z); car.reset(pl.x, pl.y, pl.yaw); }
       planeVisual.root.visible = true; planeVisual.update(0, plane, 1, this.input, 0);
       car.frozen = false; G.flying = false; rig.setVehicle('car'); rig.snapTo(car); ui.setControlsMode('car'); settings.set('vehicle', 'car'); ui.banner(null); ui.showFlyPrompt(null);
       if (!opts.silent) { audio.click(); ui.toast(nearApron ? 'Plane parked on the apron. Your car is in the car park.' : 'Your car is waiting on the road below.', 4); }

@@ -549,3 +549,15 @@ Supersedes the repeated quadrangles and square-offset campus in section 20. The 
 - Baked pavement is tiled at 400 m for frustum culling. Polygon clipping is a development dependency only, with no Boolean geometry work in the browser. A quantized signature detects stale geometry without engine-specific floating-point differences.
 - Rotated buildings use small collision tiles, preventing one oversized enclosing box from blocking forecourts. Surface grip queries the same baked polygons used for rendering.
 - The map draws actual rotated footprints and the winding network. Run `npm run test:campus` for layout, clearance, navigation, pavement coverage and overlap checks. Browser QA drives all approaches, the full loop and the original vehicle transitions; results and limits are in `CAMPUS_VALIDATION.md`.
+
+
+## 22. Road-bounded forest campus (25 September 2026)
+
+This revision supersedes section 21's buildings outside the loop and in the northern half. The existing winding perimeter road stays in place and defines the university estate edge.
+
+- Keep every building footprint, roof/portico clearance and forecourt inside the loop, clear of the carriageway. All university buildings belong to the entrance/south side or lower portions of the west/east sides; no university building sits in the upper half of the village square. The measured village itself is unchanged.
+- The constrained layout has 46 separate buildings: 19 front/south, 14 lower west and 13 lower east. The original six featured institutions are retained and relocated. The arrival gate/lodge and sports lawn are also moved inside. Convocation Hall's approach remains the default car start.
+- Fill all plantable land between village and loop with woodland, rather than isolated groves. Preserve clearance around buildings, forecourts, roads, sports facilities and the operating runway/approach corridor. `university-forest.js` defines these exclusions and seeded jittered coverage. Medium quality renders 21,402 campus trees, including 13,823 in the rear half, plus 2,747 shrubs. No campus tree is outside the perimeter.
+- Four foliage palettes and restrained per-instance brightness variation create olive, medium and darker greens. Recolour foliage vertices only so trunks retain their bark colours. Match simplified distant-tree dimensions to their detailed species, using a low triangle count and spatial instancing. No extra texture/model pack or real-time point light is required.
+- The grass/forest floor follows the loop polygon with a hole for the measured village. A subtle world-space material variation breaks up the floor colour. Outside the loop, the larger world is dry soil with brown distant hills, replacing the old green farmland background. The map shows this same boundary, forest and bare exterior.
+- Keep the runway, hangar, aircraft and all village/boat behaviour. Surface union/difference, joined kerbs and path-based navigation continue to use the common campus plan. Validate rotated footprints, canopy clearances, shader compilation, all road envelopes, every building approach and a full loop before deploying.

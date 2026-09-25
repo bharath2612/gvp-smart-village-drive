@@ -6,19 +6,22 @@ import {roadPlacement} from '../src/world/layout.js';
 import {pointInPolygon} from '../src/util/math.js';
 import {surfaceArea} from './campus-surfaces.mjs';
 const p=createCampusPlan(),loop=p.roads[0],data=JSON.parse(fs.readFileSync('src/world/generated/university-surfaces.json'));
-assert.equal(p.precincts.length,94);
+assert.ok(p.precincts.length>=35,'enough independent campus buildings');
 assert.equal(data.key,campusPlanKey(p));
 assert.deepEqual(loop.points[0],loop.points.at(-1));
 assert.equal(nearestCampusRoad(p,p.spawn.x,p.spawn.z).dist,0);
 assert.deepEqual(createCampusPlan(),p,'stable seeded generation');
 const sides={north:0,south:0,east:0,west:0};
 for(const c of p.precincts){
+  assert.ok(c.z>1500,'rear half contains no university buildings');
+  for(const [x,z]of [...c.footprints.flat(),...c.court])assert.ok(pointInPolygon(x,z,p.boundary)&&projectPath(loop,x,z).dist>19,'entire building and court inside perimeter road');
   sides[c.z<0?'north':c.z>3000?'south':c.x<0?'west':'east']++;
   assert.ok(projectPath(loop,c.entry.x,c.entry.z).dist<.01,`${c.name}: connected`);
   for(const box of c.boxes){for(const [x,z]of [[box.x0,box.z0],[box.x1,box.z1],[box.x0,box.z1],[box.x1,box.z0]]){assert.ok(!inAirfield(p,x,z,10),`${c.name}: runway clearance`);assert.ok(x<0||x>3000||z<0||z>3000,`${c.name}: village protected`);}}
   for(const r of p.roads)for(const q of pathSamples(r,8))assert.ok(!BUILDING_TYPES[c.kind].blocks.some(([bx,bz,w,d])=>{const dx=q.x-c.x,dz=q.z-c.z,lx=Math.cos(c.rot)*dx-Math.sin(c.rot)*dz,lz=Math.sin(c.rot)*dx+Math.cos(c.rot)*dz;return Math.abs(lx-bx)<w/2+r.width/2+2&&Math.abs(lz-bz)<d/2+r.width/2+2;}),`${c.name}: road ${r.id} enters footprint`);
 }
-assert.ok(Object.values(sides).every(n=>n>=10),`four populated sides ${JSON.stringify(sides)}`);
+assert.equal(sides.north,0);assert.ok(sides.south>=10&&sides.east>=5&&sides.west>=5,'front and lower sides populated');
+for(const [x,z] of [[p.gate.x-22,p.gate.z-20],[p.gate.x+50,p.gate.z+15],[p.sports.x-15,p.sports.z-15],[p.sports.x+p.sports.w+15,p.sports.z+p.sports.h+15]])assert.ok(pointInPolygon(x,z,p.boundary),'gate/lodge/sports inside perimeter');
 const north=loop.points.filter(q=>q.z<0).map(q=>q.z);assert.ok(Math.max(...north)-Math.min(...north)>200,'irregular northern perimeter');
 const fallback={road:{x:0,y:0,w:3000,h:25,horizontal:true},dist:1e6},world={nearestRoad:()=>fallback,onRoad:()=>null,zoneOf:()=> 'village'};registerCampus(world,p);
 const has=(polys,x,z)=>polys?.some(poly=>pointInPolygon(x,z,poly[0])&&!poly.slice(1).some(h=>pointInPolygon(x,z,h)));

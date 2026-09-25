@@ -7,16 +7,21 @@ with sync_playwright() as p:
  chrome=os.environ.get('CHROME_BIN','/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
  browser=p.chromium.launch(headless=True,**({'executable_path':chrome,'args':['--use-angle=metal']} if pathlib.Path(chrome).exists() else {}))
  page=browser.new_page(viewport={'width':1440,'height':900},device_scale_factor=1)
- errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
- page.goto(BASE+'/?quality=medium&vehicle=car',wait_until='networkidle');page.wait_for_function('!!window.__svd',timeout=90000)
+ errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('console',lambda e:errors.append(e.text) if e.type=='error' and ('WebGLProgram' in e.text or '[boot]' in e.text) else None)
+ page.goto(BASE+'/?quality=medium&vehicle=car',wait_until='networkidle');page.wait_for_function("!!window.__svd||!document.querySelector('#fatal').hidden",timeout=90000);assert page.evaluate('!!window.__svd'),page.locator('#fatal').inner_text()
  page.locator('#start-btn').click();page.evaluate('''()=>{const S=__svd;S.finishSwoop();S.loop.running=false;S.loop.paused=true;S.loop.render(.016,1);}''');page.wait_for_timeout(100)
  result=page.evaluate('''async()=>{
- const S=__svd,P=S.ctx.university,{pathSamples,projectPath,campusPoint,nearestCampusRoad}=await import('/src/world/university-plan.js'),{roadPlacement}=await import('/src/world/layout.js');
+ const S=__svd,P=S.ctx.university,{pathSamples,projectPath,campusPoint,nearestCampusRoad,insideCampus}=await import('/src/world/university-plan.js'),{roadPlacement}=await import('/src/world/layout.js');
  const results={};const failures=[];const check=(ok,msg)=>{if(!ok)failures.push(msg);};
  check(S.car.x===P.spawn.x&&S.car.z===P.spawn.z,'outside spawn');
  check(S.world.L.farms.length===564&&S.world.L.villas.length===560&&S.world.L.townhouses.length===504,'CAD counts');
  let surfaceNormals=true;S.ctx.scene.getObjectByName('university').traverse(m=>{if(m.name.startsWith('university-asphalt-')){const n=m.geometry.attributes.normal;for(let i=0;i<n.count;i++)if(n.getY(i)<.99)surfaceNormals=false;}});check(surfaceNormals,'road surfaces upwards');
  results.campus={buildings:P.precincts.length,trees:P.treeCount,shrubs:P.shrubCount,lamps:P.lampCount};
+ const outsideTrees=P.treeSites.filter(t=>!insideCampus(P,t.x,t.z,20));check(!outsideTrees.length,'trees restricted to campus interior');check(P.treeCount>10000,'woodland density');
+ const rearTrees=P.treeSites.filter(t=>t.z<1500);check(rearTrees.length>P.treeCount*.4,'rear half filled with woodland');
+ check(P.precincts.every(p=>p.z>1500&&p.footprints.flat().every(([x,z])=>insideCampus(P,x,z,19))),'all buildings inside front half');
+ results.forest={rearTrees:rearTrees.length,outsideTrees:outsideTrees.length};
+ check(!S.ctx.renderer.info.programs.some(p=>p.diagnostics&&!p.diagnostics.runnable),'all terrain and foliage shaders compile');
  const blocked=[];let samples=0;
  for(const road of P.roads){for(const q of pathSamples(road,4)){
    for(const side of (road.loop?[-4,0,4]:[0])){

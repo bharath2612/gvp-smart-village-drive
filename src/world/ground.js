@@ -4,8 +4,8 @@ import { patchGeo, merge, stdMat } from './geo.js';
 
 export function buildGround(ctx) {
   const { scene, world, T } = ctx;
-  const S = CONFIG.world.size, O = CONFIG.world.outside;
-  const base = new THREE.Mesh(patchGeo(-O, -O, S + 2 * O, S + 2 * O, 6, 0), stdMat(T, T.grass));
+  const S = CONFIG.world.size;
+  const base = new THREE.Mesh(patchGeo(0, 0, S, S, 6, 0), stdMat(T, T.grass));
   base.receiveShadow = true; base.name = 'ground';
   scene.add(base);
 

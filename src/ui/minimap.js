@@ -24,8 +24,9 @@ export class Minimap {
   drawBase(g, size, labels) {
     const k = size / this.extent; const L = this.world.L;
     g.fillStyle = '#1b2a1c'; g.fillRect(0, 0, size, size);
-    g.fillStyle = '#23331f'; g.fillRect(0, 0, size, size);
+    g.fillStyle = '#77614a'; g.fillRect(0, 0, size, size);
     g.save(); g.translate(-this.bounds.minX * k, -this.bounds.minZ * k);
+    if(this.world.campus){const b=this.world.campus.boundary;g.fillStyle='#2d4934';g.beginPath();b.forEach(([x,z],i)=>i?g.lineTo(x*k,z*k):g.moveTo(x*k,z*k));g.closePath();g.fill();}
     const rect = (r, c) => { g.fillStyle = c; g.fillRect(r.x * k, r.y * k, r.w * k, r.h * k); };
     for (const f of L.farms) rect(f, '#2d5a3d');
     for (const p of L.parks) rect(p, '#3f8a4a');
@@ -57,7 +58,7 @@ export class Minimap {
   drawCampus(g, k, labels) {
     const p = this.world.campus;
     g.lineCap = 'round'; g.lineJoin = 'round';
-    g.fillStyle='#304d37';for(const a of p.groves||[]){g.beginPath();g.ellipse(a.x*k,a.z*k,a.rx*k,a.rz*k,0,0,Math.PI*2);g.fill();}
+    for(let i=0;i<(p.treeSites?.length||0);i+=3){const q=p.treeSites[i];g.fillStyle=['#395b3c','#45653e','#2a4533'][i%7%3];g.beginPath();g.arc(q.x*k,q.z*k,5*k,0,Math.PI*2);g.fill();}
     for (const r of p.roads) { g.strokeStyle = '#b9b6a8'; g.lineWidth = Math.max(2, r.width * k); g.beginPath(); r.points.forEach((q, i) => i ? g.lineTo(q.x * k, q.z * k) : g.moveTo(q.x * k, q.z * k)); g.stroke(); }
     // Runway, apron and airstrip connector are preserved on the enlarged map.
     g.fillStyle = '#798894'; g.fillRect(800*k,3168.5*k,600*k,23*k); g.fillRect(1398*k,3174*k,82*k,12*k); g.fillRect(1450*k,3160*k,60*k,40*k); g.fillRect(1494*k,3000*k,12*k,160*k);
@@ -66,7 +67,7 @@ export class Minimap {
     if(labels)for(const a of p.precincts.filter(a=>['Convocation Hall','Great Library','Aviation Academy','School of Architecture'].includes(a.name))){const q=campusPoint(a,0,-65);g.font='600 10px Arial, sans-serif';g.fillStyle='#f2e5c6';g.textAlign='center';g.fillText(a.name,q.x*k,q.z*k);}
     const s=p.sports; g.fillStyle='#54815c'; g.fillRect(s.x*k,s.z*k,s.w*k,s.h*k);
     g.fillStyle='#eee6d0'; g.textAlign='center'; g.font=`600 ${Math.max(10,18*k)}px Arial,sans-serif`;
-    if(labels){ g.fillText('GVP AIRSTRIP',1100*k,3140*k); g.fillText('CAMPUS ENTRANCE',2160*k,3700*k); g.fillText('NORTH CAMPUS',1500*k,-900*k); g.fillText('WEST CAMPUS',-880*k,1500*k); g.fillText('EAST CAMPUS',3920*k,1500*k); }
+    if(labels){ g.fillText('GVP AIRSTRIP',1100*k,3140*k); g.fillText('CAMPUS ENTRANCE',2160*k,3390*k); g.fillText('NORTH WOODLAND',1500*k,-290*k); g.fillText('WEST WOODLAND',-260*k,850*k); g.fillText('EAST WOODLAND',3240*k,900*k); }
   }
   draw(car, rings, target) {
     const c = this.canvas; const g = c.getContext('2d'); const W = c.width, H = c.height;

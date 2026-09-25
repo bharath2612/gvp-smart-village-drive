@@ -10,6 +10,7 @@ with sync_playwright() as p:
  errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('console',lambda e:errors.append(e.text) if e.type=='error' and ('WebGLProgram' in e.text or '[boot]' in e.text) else None)
  page.goto(BASE+'/?quality=medium&vehicle=car',wait_until='networkidle');page.wait_for_function("!!window.__svd||!document.querySelector('#fatal').hidden",timeout=90000);assert page.evaluate('!!window.__svd'),page.locator('#fatal').inner_text()
  page.locator('#start-btn').click();page.evaluate('''()=>{const S=__svd;S.finishSwoop();S.loop.running=false;S.loop.paused=true;S.loop.render(.016,1);}''');page.wait_for_timeout(100)
+ if os.environ.get('ROAD_BOUNDARY_QA')=='1': page.evaluate('__svd.settings.set("roadBoundary",true)')
  result=page.evaluate('''async()=>{
  const S=__svd,P=S.ctx.university,{pathSamples,projectPath,campusPoint,nearestCampusRoad,insideCampus}=await import('/src/world/university-plan.js'),{roadPlacement}=await import('/src/world/layout.js');
  const results={};const failures=[];const check=(ok,msg)=>{if(!ok)failures.push(msg);};
@@ -58,6 +59,7 @@ with sync_playwright() as p:
  bb=page.locator('#bigmap-canvas').bounding_box();x=bb['x']+(1710+1100)/5200*bb['width'];y=bb['y']+(-620+1100)/5200*bb['height']
  page.mouse.click(x,y);print('MAP_PIN',page.locator('#fly-text').inner_text(),flush=True);page.locator('#fly-btn').click()
  page.evaluate('''()=>{for(let i=0;i<330;i++)__svd.loop.render(1/60,1);}''');point=page.evaluate('({x:__svd.car.x,z:__svd.car.z})');print('MAP_TRAVEL',point,flush=True);assert abs(point['z']+620)<4
+ if os.environ.get('ROAD_BOUNDARY_QA')=='1': assert page.evaluate('__svd.ctx.roadBoundary.fits(__svd.car.x,__svd.car.z,__svd.car.yaw,__svd.car.halfL,__svd.car.halfW)')
  # Settings open/close and outside reset hotkey.
  page.keyboard.press('r');page.evaluate('()=>__svd.loop.render(.016,1)');assert page.evaluate('__svd.car.z<0')
  page.keyboard.press('Escape');page.locator('[data-act="settings"]').click();page.screenshot(path=str(OUT/'settings-regression.png'));page.keyboard.press('Escape');assert page.evaluate('__svd.G.overlay===null')

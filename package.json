@@ -11,13 +11,13 @@
     "bake-campus": "node tools/bake-university.mjs",
     "predev": "npm run bake-campus",
     "prebuild": "npm run bake-campus",
-    "test:campus": "node tools/test-campus.mjs"
+    "test:campus": "node tools/test-campus.mjs",
+    "test:road-boundary": "node tools/test-road-boundary.mjs"
   },
   "dependencies": {
     "three": "^0.180.0",
-    "vite": "^7.3.6"
-  },
-  "devDependencies": {
+    "vite": "^7.3.6",
     "polygon-clipping": "0.15.7"
-  }
+  },
+  "devDependencies": {}
 }

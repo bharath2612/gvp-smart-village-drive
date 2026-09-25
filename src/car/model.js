@@ -16,7 +16,15 @@ export class CarModel {
     this.telemetry = { slip: 0, latG: 0, accel: 0, impact: 0 };
     this.history = [];
   }
+  setRoadBoundary(enabled) {
+    this.roadBoundaryEnabled = !!enabled;
+    if (!enabled) return false;
+    const p = this.ctx.roadBoundary.nearest(this.x, this.z, this.yaw, this.halfL, this.halfW);
+    const moved = Math.hypot(p.x - this.x, p.z - this.z) > .01 || Math.abs(p.yaw - this.yaw) > .01;
+    const frozen = this.frozen; this.reset(p.x, p.z, p.yaw); this.frozen = frozen; return moved;
+  }
   reset(x, z, yaw) {
+    if (this.roadBoundaryEnabled) ({ x, z, yaw } = this.ctx.roadBoundary.nearest(x, z, yaw, this.halfL, this.halfW));
     this.x = x; this.z = z; this.yaw = yaw; this.vx = 0; this.vz = 0; this.steer = 0;
     this.px = x; this.pz = z; this.pyaw = yaw;
     this.frozen = false; this.stuck = 0; this.lakeSteps = 0;
@@ -108,6 +116,7 @@ export class CarModel {
     this.x += this.vx * dt; this.z += this.vz * dt;
 
     this.resolveCollisions(dt);
+    if (this.roadBoundaryEnabled) this.ctx.roadBoundary.constrain(this);
     this.checkTriggers(dt);
     this.wheelSpin = (this.wheelSpin || 0) + vF * dt / 0.38;
   }

@@ -2,7 +2,7 @@
 const DEFAULTS = {
   quality: 'auto', timeOfDay: 'day', master: 80, engine: 70, ambience: 60, chaseDistance: 'normal', invertSteer: false,
   minimapMode: 'north', muted: false, bestLap: null, seenControls: false,
-  vehicle: 'car', flightAssist: 'full', pitchMode: 'pilot',
+  roadBoundary: false, vehicle: 'car', flightAssist: 'full', pitchMode: 'pilot',
 };
 const KEY = 'svd-settings-v1';
 export class Settings {

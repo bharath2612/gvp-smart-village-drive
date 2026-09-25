@@ -35,6 +35,7 @@ import { buildHorizon } from './world/horizon.js';
 import { buildUniversity } from './world/university.js';
 import { Vehicles } from './game/vehicles.js';
 import { UI } from './ui/hud.js';
+import { buildRoadBoundary } from './world/road-boundary.js';
 import { SettingsScreen } from './ui/settingsScreen.js';
 import { clamp, lerp } from './util/math.js';
 
@@ -97,6 +98,7 @@ async function boot() {
   // Paved (non-slowing) areas besides roads.
   ctx.pavedRects = [...world.L.commercial, ...world.L.amenities.filter((a) => ['parking', 'agro', 'fire-station', 'wtp', 'school', 'stadium'].includes(a.id)), ...world.L.parks.map((p) => ({ x: p.x, y: p.y + p.h / 2 - 2, w: p.w, h: 4 })), ...ctx.airstrip.paved, ...ctx.university.paved];
 
+  buildRoadBoundary(ctx);
   const input = new Input(); input.invertSteer = settings.get('invertSteer'); input.invertPitch = settings.get('pitchMode') === 'arcade';
   const car = new CarModel(world, colliders, ctx);
   const carVisual = new CarVisual(scene, ctx.T, carModel);
@@ -224,9 +226,15 @@ async function boot() {
     onAssist: (v) => { settings.set('flightAssist', v); plane.assist = v; },
     onPitch: (v) => { settings.set('pitchMode', v); input.invertPitch = v === 'arcade'; },
     onClose: () => { audio.click(); closeOverlay(); },
-    onDefaults: () => { for (const k of ['master', 'engine', 'ambience', 'chaseDistance', 'invertSteer', 'minimapMode', 'flightAssist', 'pitchMode', 'quality']) settings.set(k, settings.defaults[k]); audio.applyVolumes(); input.invertSteer = false; input.invertPitch = false; minimap.mode = 'north'; plane.assist = 'full'; settingsScreen.refresh(); ui.toast('Settings restored to defaults.', 3); },
+    onDefaults: () => { for (const k of ['roadBoundary', 'master', 'engine', 'ambience', 'chaseDistance', 'invertSteer', 'minimapMode', 'flightAssist', 'pitchMode', 'quality']) settings.set(k, settings.defaults[k]); audio.applyVolumes(); input.invertSteer = false; input.invertPitch = false; minimap.mode = 'north'; plane.assist = 'full'; settingsScreen.refresh(); ui.toast('Settings restored to defaults.', 3); },
   }, ctx);
   ctx.carVisual = carVisual;
+  car.setRoadBoundary(settings.get('roadBoundary'));
+  settings.onChange((key, value) => {
+    if (key !== 'roadBoundary') return;
+    const moved = car.setRoadBoundary(value);
+    if (moved && !G.flying && !G.boating) { rig.snapTo(car); ui.toast('Road boundaries on. Returned your car to clear paving.', 4); }
+  });
   function syncSettingsUI() { settingsScreen.show(); }
   document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
     const act = b.dataset.act; audio.click();

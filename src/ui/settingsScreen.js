@@ -64,7 +64,8 @@ export class SettingsScreen {
     const row = h('div', 'gs-row'); row.tabIndex = 0; row.dataset.key = key;
     row.appendChild(h('div', 'gs-label', `<b>${label}</b>${desc ? `<span>${desc}</span>` : ''}`));
     const sw = h('button', 'gs-switch', '<i></i>'); sw.onclick = () => { set(!get()); this.refresh(); }; row.appendChild(sw);
-    row._refresh = () => sw.classList.toggle('on', !!get());
+    sw.setAttribute('role', 'switch'); sw.setAttribute('aria-label', label);
+    row._refresh = () => { sw.classList.toggle('on', !!get()); sw.setAttribute('aria-checked', String(!!get())); };
     row._step = (d) => { set(d > 0); this.refresh(); };
     parent.appendChild(row); return row;
   }
@@ -82,6 +83,7 @@ export class SettingsScreen {
       c.onclick = () => { if (v.select) { this.hooks.onVehicle(v.id); this.refresh(); this.pop(c); } else this.showVehicle(v.id); };
       cards.appendChild(c); this.cards[v.id] = c;
     }
+    this.toggle(p, { key: 'roadBoundary', label: 'Road-boundary collisions', desc: 'Keep cars on roads and paved access areas. Blocks footpaths, verges and open land. Switching on off-road returns you to clear paving. Building collisions always stay on.', get: () => this.hooks.get('roadBoundary'), set: (v) => this.hooks.set('roadBoundary', v) });
     this.segmented(p, { key: 'chaseDistance', label: 'Chase camera distance', desc: 'How far the camera trails the car or plane.', options: [['near', 'Near'], ['normal', 'Normal'], ['far', 'Far']], get: () => this.hooks.get('chaseDistance'), set: (v) => this.hooks.onChase(v) });
     this.segmented(p, { key: 'minimapMode', label: 'Minimap', desc: 'North-up like a map, or rotating with your heading.', options: [['north', 'North-up'], ['rotate', 'Rotating']], get: () => this.hooks.get('minimapMode'), set: (v) => this.hooks.onMinimap(v) });
     this.toggle(p, { key: 'invertSteer', label: 'Invert steering', desc: 'Swap A and D (and the arrow keys) on the road.', get: () => this.hooks.get('invertSteer'), set: (v) => this.hooks.onInvert(v) });
@@ -127,12 +129,18 @@ export class SettingsScreen {
   }
   key(e) {
     if (!this.open) return; const tag = e.target && e.target.tagName; if (tag === 'INPUT' && e.key !== 'Escape') return;
+    // Native buttons keep Enter; focused switches also support Space despite the
+    // game's global handbrake binding. Do not activate a different highlighted row.
+    if (tag === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) {
+      if (e.target.matches('.gs-switch')) { e.preventDefault(); e.target.click(); }
+      return;
+    }
     const t = TABS.find((x) => x[2] === e.key); if (t) { this.showTab(t[0]); e.preventDefault(); return; }
     const rows = this.rows(); if (!rows.length) return;
     if (e.key === 'ArrowDown') { this.focus = Math.min(rows.length - 1, this.focus + 1); this.refresh(); e.preventDefault(); }
     else if (e.key === 'ArrowUp') { this.focus = Math.max(0, this.focus - 1); this.refresh(); e.preventDefault(); }
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const r = rows[this.focus]; if (r && r._step) r._step(e.key === 'ArrowRight' ? 1 : -1); e.preventDefault(); }
-    else if (e.key === 'Enter') { const r = rows[this.focus]; const b = r && r.querySelector('.gs-switch, .gs-btn'); if (b) b.click(); }
+    else if (e.key === 'Enter') { const r = rows[this.focus]; const b = r && r.querySelector('.gs-switch, .gs-btn'); if (b) { e.preventDefault(); b.click(); } }
   }
   show() { this.open = true; this.root.classList.remove('hidden'); this.shown = null; this.refresh(); window.addEventListener('keydown', this.onKey, true); if (!this.preview) this.preview = new VehiclePreview(this.previewCanvas, this.ctx); this.preview.show(this.shown); this.preview.active = true; }
   hide() { this.open = false; this.root.classList.add('hidden'); window.removeEventListener('keydown', this.onKey, true); if (this.preview) this.preview.active = false; }

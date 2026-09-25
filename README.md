@@ -23,3 +23,34 @@ Controls: W/S throttle & brake, A/D steer, Space handbrake, Shift boost, E swap 
 See `DRIVE_GAME_SPEC.md` for the full specification, engineering review and test plan.
 
 Campus layout and pavement regression checks: `npm run test:campus`. Roads are unioned and clipped at build time (`npm run bake-campus`, also run automatically before dev/build), so intersecting streets share one pavement boundary. Browser route, map, flight and lighting checks are documented in `CAMPUS_VALIDATION.md`.
+
+
+### Road-boundary collisions
+
+Settings → Vehicle → **Road-boundary collisions** keeps the complete car body on
+carriageways and paved access areas, including campus drives/courts, the airstrip,
+school/stadium access and parking. Footpaths, verges, medians, lawns, cricket turf,
+water and countryside are excluded. The default is off (existing free roam), and
+the preference persists. Buildings and other solid objects collide in either mode.
+Turning it on off-road moves the car to clear paving. Resets, map travel and car
+swaps also find a safe fit for the active car. Boat and flight physics are unchanged.
+
+The collision map uses cached 64 m polygon unions, exact oriented footprint-area
+coverage and swept movement at ≤20 cm intervals. Campus input uses the original
+double-precision paving coordinates to avoid false barriers at material seams.
+It adds no meshes, textures, lights or render passes. Roads/footpaths must retain
+their semantic mesh names, and campus paving must remain in the baked surface data.
+
+Validation:
+
+```sh
+npm run test:road-boundary
+# With the dev server running and Python Playwright installed:
+python tools/test-road-boundary-browser.py
+ROAD_BOUNDARY_QA=1 python tools/test-campus-browser.py
+```
+
+The browser checks exercise mouse/keyboard switches, persistence/defaults, both
+on/off driving, every village road, occupied recovery, swaps, vehicle transitions,
+parking access, all cached surface tiles and CPU timings. The campus suite adds
+all 46 building drives, a complete loop, takeoff, boating and map travel.

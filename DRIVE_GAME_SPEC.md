@@ -535,3 +535,17 @@ This section supersedes the original inside-the-gate car spawn. User confirmed a
 - Campus lighting follows day/sunset/night presets using shared emissive materials and ground pools, with no additional real-time point lights. Existing GLBs and procedural materials are reused; no asset pack downloads.
 - Curbs/walkways are split into spatial chunks; trees have a distant stand-in; window/trim detail is culled at distance. The camera far plane follows visible fog distance at road level and expands with altitude; the sky stays inside the frustum.
 - Campus buildings have collision heights for aircraft. Courtyards are accessible to cars; building interiors are not modelled.
+
+
+## 21. Irregular university revision (25 September 2026)
+
+Supersedes the repeated quadrangles and square-offset campus in section 20. The measured 3 km village, runway and aircraft are unchanged.
+
+- A smooth, uneven loop follows 23 unequal control stations. Buildings sit on both sides at varied depths and angles. The map spans -1100 to 4100 m; that rectangular map extent is not a campus boundary wall.
+- 94 independent buildings: 20 north, 27 south, 23 east and 24 west. Six architectural families cover faculties, L-shaped institutes, residences, a domed library, clock-tower halls and garden pavilions. Stone facades, arched windows, cornices, porticoes, pitched roofs and smaller forecourts replace repeated U-shaped quadrangles. No interiors are claimed.
+- Deterministic placement excludes the village, existing drives, the arrival gate, sports lawn and runway approaches. All buildings have a drive joining Campus Drive. Car start/restart stays outside on Convocation Hall's approach.
+- Varied tree species, uneven groves, understory and wall-buffer woodland replace much of the bare lawn. Medium quality generates 4,733 campus trees and 1,392 shrubs. Sight lines, road mouths and aircraft approaches remain clear. Shared instanced geometry, distance detail culling and tree LOD limit rendering cost.
+- Road surfaces are compiled with polygon union/difference before dev/build. Asphalt takes precedence over pavers. Kerbs and sidewalks come from the combined road boundary; vertical kerb faces close the edge at driver eye level. Campus and airstrip connector surfaces meet at z=3090 without stacked strips.
+- Baked pavement is tiled at 400 m for frustum culling. Polygon clipping is a development dependency only, with no Boolean geometry work in the browser. A quantized signature detects stale geometry without engine-specific floating-point differences.
+- Rotated buildings use small collision tiles, preventing one oversized enclosing box from blocking forecourts. Surface grip queries the same baked polygons used for rendering.
+- The map draws actual rotated footprints and the winding network. Run `npm run test:campus` for layout, clearance, navigation, pavement coverage and overlap checks. Browser QA drives all approaches, the full loop and the original vehicle transitions; results and limits are in `CAMPUS_VALIDATION.md`.

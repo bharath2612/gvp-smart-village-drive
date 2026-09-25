@@ -1,83 +1,118 @@
-// Designed expansion, separate from the measured CAD layout. Coordinates are metres.
-export const CAMPUS_BOUNDS = { minX: -720, minZ: -720, maxX: 3720, maxZ: 3720 };
-export const CAMPUS_SPAWN = { x: 1370, z: 3490, yaw: Math.PI };
+// A designed, irregular campus outside the measured village. All coordinates are metres.
+import { rng, hashStr } from '../util/math.js';
+export const CAMPUS_BOUNDS = { minX: -1100, minZ: -1100, maxX: 4100, maxZ: 4100 };
+export const BUILDING_TYPES = {
+  faculty: { floors: 3, height: 15.5, blocks: [[0, 0, 64, 28]] },
+  institute: { floors: 3, height: 15.5, blocks: [[0, 0, 76, 26], [27, -27, 22, 64]] },
+  residence: { floors: 4, height: 19.5, blocks: [[0, 0, 82, 24], [-29, -12, 24, 45]] },
+  library: { floors: 3, height: 16.5, blocks: [[0, 0, 88, 40]] },
+  hall: { floors: 2, height: 12, blocks: [[0, 0, 62, 38]] },
+  pavilion: { floors: 1, height: 6.5, blocks: [[0, 0, 34, 24]] },
+};
 export function campusPoint(p, x, z) {
   const c = Math.cos(p.rot), s = Math.sin(p.rot);
   return { x: p.x + x * c + z * s, z: p.z - x * s + z * c };
 }
+export function localRect(p, x, z, w, d) {
+  return [[x-w/2,z-d/2],[x+w/2,z-d/2],[x+w/2,z+d/2],[x-w/2,z+d/2]].map(([a,b])=>{const q=campusPoint(p,a,b);return [q.x,q.z];});
+}
+export function boundsOf(points, margin=0) {
+  return { x0:Math.min(...points.map(q=>q[0]))-margin, x1:Math.max(...points.map(q=>q[0]))+margin, z0:Math.min(...points.map(q=>q[1]))-margin, z1:Math.max(...points.map(q=>q[1]))+margin };
+}
+export const inBox = (r,x,z,m=0) => x>=r.x0-m&&x<=r.x1+m&&z>=r.z0-m&&z<=r.z1+m;
 export function projectPath(path, x, z) {
   let best = { dist: Infinity };
   for (let i = 1; i < path.points.length; i++) {
-    const a = path.points[i - 1], b = path.points[i], dx = b.x - a.x, dz = b.z - a.z, d2 = dx * dx + dz * dz;
-    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / d2));
-    const px = a.x + dx * t, pz = a.z + dz * t, dist = Math.hypot(x - px, z - pz);
-    if (dist < best.dist) best = { x: px, z: pz, yaw: Math.atan2(dx, -dz), dist, segment: i - 1, t };
+    const a=path.points[i-1],b=path.points[i],dx=b.x-a.x,dz=b.z-a.z,d2=dx*dx+dz*dz;
+    if(d2<1e-8)continue;
+    const t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/d2));
+    const px=a.x+dx*t,pz=a.z+dz*t,dist=Math.hypot(x-px,z-pz);
+    if(dist<best.dist)best={x:px,z:pz,yaw:Math.atan2(dx,-dz),dist,segment:i-1,t};
   }
   return best;
 }
-export function pathSamples(path, spacing) {
-  const out = []; let walked = 0, next = 0;
-  for (let i = 1; i < path.points.length; i++) {
-    const a = path.points[i - 1], b = path.points[i], dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
-    while (next < walked + len - 0.001) { const t = (next - walked) / len; out.push({ x: a.x + dx * t, z: a.z + dz * t, nx: -dz / len, nz: dx / len, dx: dx / len, dz: dz / len, at: next }); next += spacing; }
-    walked += len;
+export function pathSamples(path,spacing) {
+  const out=[];let walked=0,next=0;
+  for(let i=1;i<path.points.length;i++){
+    const a=path.points[i-1],b=path.points[i],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<1e-8)continue;
+    while(next<walked+len-.001){const t=(next-walked)/len;out.push({x:a.x+dx*t,z:a.z+dz*t,nx:-dz/len,nz:dx/len,dx:dx/len,dz:dz/len,at:next});next+=spacing;}
+    walked+=len;
   }
   return out;
 }
-export function createCampusPlan() {
-  const roads = [], precincts = [];
-  const road = (id, points, width = 12, extra = {}) => { const p = { id, points: points.map(([x, z]) => ({ x, z })), width, kind: 'university', ...extra }; roads.push(p); return p; };
-  const ring = []; const R = 120, lo = -420, hi = 3420;
-  for (const [cx, cz, a0] of [[lo + R, lo + R, Math.PI], [hi - R, lo + R, 1.5 * Math.PI], [hi - R, hi - R, 0], [lo + R, hi - R, Math.PI / 2]]) {
-    for (let i = 0; i <= 24; i++) { const a = a0 + i * Math.PI / 48; ring.push([cx + Math.cos(a) * R, cz + Math.sin(a) * R]); }
+// Smooth through uneven control stations rather than offsetting a square.
+function windingLoop(anchors) {
+  const points=[];const n=anchors.length;
+  for(let i=0;i<n;i++){
+    const a=anchors[(i+n-1)%n],b=anchors[i],c=anchors[(i+1)%n],d=anchors[(i+2)%n];
+    const steps=Math.ceil(Math.hypot(c[0]-b[0],c[1]-b[1])/35);
+    for(let j=0;j<steps;j++){
+      const t=j/steps,t2=t*t,t3=t2*t;
+      const at=k=>(2*t3-3*t2+1)*b[k]+(t3-2*t2+t)*.32*(c[k]-a[k])+(-2*t3+3*t2)*c[k]+(t3-t2)*.32*(d[k]-b[k]);
+      points.push([at(0),at(1)]);
+    }
   }
-  ring.push(ring[0]);
-  road('university-loop', ring, 18, { loop: true, name: 'University Loop' });
-  road('university-entrance', [[2160, 3690], [2160, 3060]], 18);
-  road('village-link', [[1500, 3060], [2160, 3060]], 12);
-  // Existing airstrip access road meets this junction. No campus road crosses the runway or apron.
-  road('gate-link', [[1500, 3003], [1500, 3090]], 12);
-  const add = (name, x, z, rot, kind = 'college') => {
-    const p = { id: `university-${precincts.length + 1}`, name, x, z, rot, kind };
-    const front = campusPoint(p, 0, 14), end = campusPoint(p, 0, 190);
-    p.road = road(`${p.id}-drive`, [[front.x, front.z], [end.x, end.z]], 12, { drive: true });
-    p.entry = end; precincts.push(p); return p;
+  points.push(points[0]);return points;
+}
+export function createCampusPlan() {
+  const random=rng(251926),roads=[],precincts=[];
+  const road=(id,points,width=10,extra={})=>{const p={id,points:points.map(([x,z])=>({x,z})),width,kind:'university',...extra};roads.push(p);return p;};
+  const loop=road('university-loop',windingLoop([[-270,0],[-510,450],[-350,950],[-620,1570],[-500,2190],[-300,2830],[-170,3370],[470,3480],[1130,3430],[1700,3480],[2260,3390],[2940,3580],[3530,3380],[3480,2710],[3300,2110],[3570,1500],[3370,780],[3440,140],[3050,-400],[2340,-280],[1710,-620],[950,-430],[360,-560]]),18,{loop:true,name:'Campus Drive'});
+  road('university-entrance',[[2160,3690],[2160,3060]],16);
+  road('village-link',[[1500,3060],[2160,3060]],12);
+  road('gate-link',[[1500,3000],[1500,3090]],12,{flatEnds:true});
+  const plan={bounds:CAMPUS_BOUNDS,roads,precincts,sports:{x:3770,z:1840,w:100,h:160},airfield:{x0:700,x1:1580,z0:3075,z1:3285},arrival:{x0:2138,x1:2210,z0:3640,z1:3675},approach:{x0:-1100,x1:4100,z0:3100,z1:3260}};
+  const sportsEntry=projectPath(loop,3760,1930);road('sports-drive',[[sportsEntry.x,sportsEntry.z],[3757,1930]],10);
+  const inVillage=(r,m=20)=>r.x1>-m&&r.x0<3000+m&&r.z1>-m&&r.z0<3000+m;
+  const intersects=(a,b,m=0)=>a.x0<b.x1+m&&a.x1>b.x0-m&&a.z0<b.z1+m&&a.z1>b.z0-m;
+  const add=(name,x,z,kind,twist=0)=>{
+    const target=projectPath(loop,x,z),rot=Math.atan2(target.x-x,target.z-z)+twist;
+    const p={id:`university-${precincts.length+1}`,name,x,z,rot,kind};
+    const type=BUILDING_TYPES[kind];p.footprints=type.blocks.map(([bx,bz,w,d])=>localRect(p,bx,bz,w,d));p.boxes=p.footprints.map(q=>boundsOf(q,3));
+    const front=Math.max(...type.blocks.map(([bx,bz,w,d])=>bz+d/2));
+    p.front=front;p.plaza={x:0,z:front+19,w:kind==='pavilion'?46:70,d:28};p.court=localRect(p,0,p.plaza.z,p.plaza.w,p.plaza.d);p.courtBox=boundsOf(p.court);
+    const body=boundsOf(p.footprints.flat(),16);
+    if(inVillage(body)||inAirfield(plan,x,z,Math.max(body.x1-body.x0,body.z1-body.z0)/2+10))return null;
+    if(body.x0<-1020||body.z0<-1020||body.x1>4020||body.z1>4020)return null;
+    if(intersects(body,{x0:plan.sports.x-10,x1:plan.sports.x+plan.sports.w+10,z0:plan.sports.z-10,z1:plan.sports.z+plan.sports.h+10}))return null;
+    if(intersects(body,plan.arrival,10))return null;
+    if(precincts.some(o=>intersects(body,o.landBox,14)))return null;
+    const mouth=campusPoint(p,0,p.plaza.z);
+    const drive={points:[mouth,{x:target.x,z:target.z}],width:9};
+    if(target.dist<front+58||target.dist>330)return null;
+    // Do not let a new footprint swallow any existing route, nor send its drive through another building.
+    if(roads.some(r=>pathSamples(r,8).some(q=>inBox(body,q.x,q.z,r.width/2+6))))return null;
+    if(pathSamples(drive,4).some(q=>inVillage({x0:q.x-6,x1:q.x+6,z0:q.z-6,z1:q.z+6},4)||precincts.some(o=>o.boxes.some(b=>inBox(b,q.x,q.z,9)))||inAirfield(plan,q.x,q.z,8)||inBox(plan.arrival,q.x,q.z,8)))return null;
+    p.landBox=boundsOf([...p.footprints.flat(),...p.court],12);p.entry={x:target.x,z:target.z};
+    p.road=road(`${p.id}-drive`,[[mouth.x,mouth.z],[target.x,target.z]],9,{drive:true});precincts.push(p);return p;
   };
-  ['College of Sciences', 'College of Engineering', 'Great Library', 'Arts & Humanities', 'School of Architecture'].forEach((n, i) => add(n, 160 + i * 650, -230, Math.PI, i === 2 ? 'library' : 'college'));
-  ['Founders College', 'Scholars Residence', 'Graduate College', 'West Commons'].forEach((n, i) => add(n, -230, 250 + i * 780, -Math.PI / 2, i === 1 || i === 2 ? 'residence' : 'college'));
-  ['East Residence', 'Research Institute', 'School of Medicine', 'Sports Pavilion'].forEach((n, i) => add(n, 3230, 250 + i * 780, Math.PI / 2, i === 0 ? 'residence' : i === 3 ? 'hall' : 'college'));
-  ['Agricultural College', 'Aviation Academy', 'Convocation Hall', 'Administration', 'Student Union'].forEach((n, i) => add(n, [130, 750, 1370, 1870, 2670][i], 3610, Math.PI, i === 2 || i === 4 ? 'hall' : 'college'));
-  road('sports-drive', [[3420, 1950], [3497, 1950]], 12);
-  const sports = { x: 3510, z: 1870, w: 100, h: 160 };
-  const plan = { bounds: CAMPUS_BOUNDS, spawn: CAMPUS_SPAWN, roads, precincts, sports,
-    // Physical airstrip + lateral approach corridor. Trees, buildings and lamp posts avoid it.
-    airfield: { x0: 700, x1: 1580, z0: 3075, z1: 3285 },
-    approach: { x0: -720, x1: 3720, z0: 3100, z1: 3260 },
-  };
+  const hall=add('Convocation Hall',1370,3640,'hall',-.08);
+  add('Great Library',1430,-290,'library',.12);
+  add('Founders House',-210,560,'hall',-.16);
+  add('School of Architecture',3660,1210,'institute',.19);
+  add('Aviation Academy',720,3690,'faculty',-.12);
+  add('Student Union',2610,3790,'hall',.10);
+  const names=['Engineering','Humanities','Life Sciences','Mathematics','Economics','Agriculture','Materials','Fine Arts','Law','Medicine','Business','Earth Sciences','Languages','Computing'];
+  const kinds=['faculty','institute','residence','pavilion','faculty','residence','hall'];
+  // Irregular gaps, depth and orientation; seeded so buildings stay put across visits.
+  const stations=pathSamples(loop,62);let serial=0;
+  for(let pass=0;pass<3&&precincts.length<94;pass++)for(let i=0;i<stations.length&&precincts.length<94;i++){
+    if(random()<.28)continue;const q=stations[i],side=random()<.54?-1:1;
+    const offset=90+random()*205,x=q.x+q.nx*side*offset+(random()-.5)*40,z=q.z+q.nz*side*offset+(random()-.5)*40;
+    const kind=kinds[Math.floor(random()*kinds.length)],label=kind==='residence'?`Residence ${1+serial%19}`:kind==='pavilion'?`Garden Pavilion ${1+serial%12}`:`${names[serial%names.length]} ${kind==='institute'?'Institute':kind==='hall'?'Hall':'Building'}`;
+    if(add(label,x,z,kind,(random()-.5)*.42))serial++;
+  }
+  if(!hall||precincts.length<70)throw new Error(`Campus planning failed: ${precincts.length} buildings`);
+  // Start outside, on the hall approach. Preserve the aircraft and original village entry.
+  const a=hall.road.points[0],b=hall.road.points[1];plan.spawn={x:a.x+(b.x-a.x)*.66,z:a.z+(b.z-a.z)*.66,yaw:Math.atan2(a.x-b.x,-(a.z-b.z))};
   return plan;
 }
-export function inAirfield(plan, x, z, margin = 0) {
-  return [plan.airfield, plan.approach].some(r => x >= r.x0 - margin && x <= r.x1 + margin && z >= r.z0 - margin && z <= r.z1 + margin);
-}
-export function nearestCampusRoad(plan, x, z) {
-  let best = null;
-  for (const road of plan.roads) { const q = projectPath(road, x, z); const dist = Math.max(0, q.dist - road.width / 2); if (!best || dist < best.dist) best = { road, dist, projection: q }; }
-  return best;
-}
-// Add navigation after the measured world has been built; never mutate CAD roads or plot counts.
-export function registerCampus(world, plan) {
-  world.campus = plan;
-  const oldNearest = world.nearestRoad, oldOnRoad = world.onRoad, oldZone = world.zoneOf;
-  world.nearestRoad = (x, z, filter) => {
-    const village = oldNearest(x, z, filter); if (filter) return village;
-    const campus = nearestCampusRoad(plan, x, z); return campus.dist < village.dist ? campus : village;
-  };
-  world.onRoad = (x, z) => { const v = oldOnRoad(x, z); if (v || (x >= 0 && x <= 3000 && z >= 0 && z <= 3000)) return v; const c = nearestCampusRoad(plan, x, z); return c.dist < 0.01 ? c.road : null; };
-  world.zoneOf = (x, z) => {
-    if (x >= 0 && z >= 0 && x <= 3000 && z <= 3000) return oldZone(x, z);
-    if (x >= 770 && x <= 1545 && z >= 3090 && z <= 3265) return 'GVP Airstrip';
-    const p = plan.precincts.find(p => Math.hypot(x - p.x, z - p.z) < 140);
-    if (p) return p.name;
-    return z < 0 ? 'University · North Quadrangles' : x < 0 ? 'University · West Colleges' : x > 3000 ? 'University · East Campus' : 'University · South Campus';
-  };
+export function inAirfield(plan,x,z,margin=0){return [plan.airfield,plan.approach].some(r=>inBox(r,x,z,margin));}
+export function nearestCampusRoad(plan,x,z){let best=null;for(const road of plan.roads){const q=projectPath(road,x,z),dist=Math.max(0,q.dist-road.width/2);if(!best||dist<best.dist)best={road,dist,projection:q};}return best;}
+export function campusPlanKey(plan){return hashStr(JSON.stringify({roads:plan.roads,buildings:plan.precincts.map(p=>({footprints:p.footprints,court:p.court}))},(k,v)=>typeof v==='number'?Math.round(v*1000)/1000:v));}
+export function registerCampus(world,plan){
+  world.campus=plan;const oldNearest=world.nearestRoad,oldOnRoad=world.onRoad,oldZone=world.zoneOf;
+  world.nearestRoad=(x,z,filter)=>{const village=oldNearest(x,z,filter);if(filter)return village;const campus=nearestCampusRoad(plan,x,z);return campus.dist<village.dist?campus:village;};
+  world.onRoad=(x,z)=>{const v=oldOnRoad(x,z);if(v||(x>=0&&x<=3000&&z>=0&&z<=3000))return v;const c=nearestCampusRoad(plan,x,z);return c.dist<.01?c.road:null;};
+  world.zoneOf=(x,z)=>{if(x>=0&&z>=0&&x<=3000&&z<=3000)return oldZone(x,z);if(x>=770&&x<=1545&&z>=3090&&z<=3265)return 'GVP Airstrip';const p=plan.precincts.find(p=>Math.hypot(x-p.x,z-p.z)<80);if(p)return p.name;return z<0?'University · North Campus':x<0?'University · West Campus':x>3000?'University · East Campus':'University · South Campus';};
 }

@@ -87,7 +87,7 @@ async function boot() {
     ['Filling the lake…', () => buildLake(ctx)],
     ['Planting trees, hedges and crops…', () => buildVegetation(ctx)],
     ['Parking cars, planting flowers…', () => buildProps(ctx)],
-    ['Building the university quadrangles and campus loop…', () => buildUniversity(ctx)],
+    ['Building the university and woodland campus…', () => buildUniversity(ctx)],
     ['Wiring street, garden and stadium lights…', () => buildLights(ctx)],
     ['Lighting…', () => buildLighting(ctx)],
   ];

@@ -43,7 +43,7 @@ export class CarModel {
 
     // Surface
     const road = this.world.onRoad(this.x, this.z);
-    const paved = road || (this.ctx.pavedRects || []).some((q) => this.x >= q.x && this.x <= q.x + q.w && this.z >= q.y && this.z <= q.y + q.h);
+    const paved = road || this.ctx.university?.isPaved(this.x, this.z) || (this.ctx.pavedRects || []).some((q) => this.x >= q.x && this.x <= q.x + q.w && this.z >= q.y && this.z <= q.y + q.h);
     this.offroad = !paved;
     const hedge = this.inHedge();
     if (hedge && !this.hedgeWas) this.events.push({ type: 'hedge' });

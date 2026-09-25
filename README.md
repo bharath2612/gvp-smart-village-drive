@@ -5,9 +5,9 @@ Browser driving game over the full 3 km × 3 km GVP Smart Village master plan at
 **Play:** https://gvp-smart-village-drive.vercel.app
 
 - Vite + Three.js, no framework. Fixed 120 Hz arcade car simulation, 2D collision grid, instanced procedural buildings.
-- University campus around all four village walls: 18 stone quadrangles, a domed library, clock-tower halls, residences, sports lawn, warm lantern lighting and a ~15.2 km loop road. The car starts outside at Convocation Hall; the village gate and airstrip remain accessible. The minimap, full map and road reset include the campus. This is a designed expansion, kept separate from the measured CAD layout.
+- University campus around all four village walls: 94 separate stone buildings with varied footprints, orientations and setbacks, a domed library, clock-tower halls, residences, sports lawn, warm lantern lighting and a winding ~15.1 km loop road. The car starts outside at Convocation Hall; the village gate and airstrip remain accessible. The minimap, full map and road reset include the campus. This is a designed expansion, kept separate from the measured CAD layout.
 - Three vehicles: the SUV, a motor boat on the lake (press B at the marina gate) and a Cessna 172 style charter plane at GVP Airstrip outside the main gate (press F at the hangar, or Settings → Vehicle → Charter plane). The plane has an arcade-real flight model (lift, drag, thrust, stall, flaps, assists), four cameras including a live cockpit panel, a Sky tour mission, a soft boundary 2 km beyond the wall and a 900 m ceiling.
-- Textures and sounds are generated in the browser (canvas noise textures, Web Audio synthesis). Trees, the SUV, parked cars and small props are CC0 low-poly GLBs from the Kenney Nature Kit and Car Kit (`node tools/fetch-assets.mjs`, ~1.7 MB), baked into vertex-coloured geometry and instanced. Total download stays under 3 MB.
+- Textures and sounds are generated in the browser (canvas noise textures, Web Audio synthesis). Trees, the SUV, parked cars and small props are CC0 low-poly GLBs from the Kenney Nature Kit and Car Kit (`node tools/fetch-assets.mjs`, ~1.7 MB), baked into vertex-coloured geometry and instanced. No additional model or texture packs are needed for the campus.
 - Want your own SUV? Drop a GLB at `public/models/suv.glb` (wheels as nodes named `wheel-front-*` / `wheel-back-*`); the paint is recoloured to the brand colour automatically.
 - `public/data/layout.json` is copied from the plan repo with `npm run copy-layout` (never edit by hand). Counts are checked at load and the game refuses to start on a mismatch.
 - `public/data/plots.json` holds availability, `public/data/prices.json` the indicative price rules.
@@ -22,4 +22,4 @@ Controls: W/S throttle & brake, A/D steer, Space handbrake, Shift boost, E swap 
 
 See `DRIVE_GAME_SPEC.md` for the full specification, engineering review and test plan.
 
-Campus layout regression checks: `node tools/test-campus.mjs`. Browser route, map, flight and lighting checks are documented in `CAMPUS_VALIDATION.md`.
+Campus layout and pavement regression checks: `npm run test:campus`. Roads are unioned and clipped at build time (`npm run bake-campus`, also run automatically before dev/build), so intersecting streets share one pavement boundary. Browser route, map, flight and lighting checks are documented in `CAMPUS_VALIDATION.md`.

@@ -57,18 +57,16 @@ export class Minimap {
   drawCampus(g, k, labels) {
     const p = this.world.campus;
     g.lineCap = 'round'; g.lineJoin = 'round';
+    g.fillStyle='#304d37';for(const a of p.groves||[]){g.beginPath();g.ellipse(a.x*k,a.z*k,a.rx*k,a.rz*k,0,0,Math.PI*2);g.fill();}
     for (const r of p.roads) { g.strokeStyle = '#b9b6a8'; g.lineWidth = Math.max(2, r.width * k); g.beginPath(); r.points.forEach((q, i) => i ? g.lineTo(q.x * k, q.z * k) : g.moveTo(q.x * k, q.z * k)); g.stroke(); }
     // Runway, apron and airstrip connector are preserved on the enlarged map.
     g.fillStyle = '#798894'; g.fillRect(800*k,3168.5*k,600*k,23*k); g.fillRect(1398*k,3174*k,82*k,12*k); g.fillRect(1450*k,3160*k,60*k,40*k); g.fillRect(1494*k,3000*k,12*k,160*k);
-    for (const a of p.precincts) {
-      g.save(); g.translate(a.x*k, a.z*k); g.rotate(-a.rot);
-      g.fillStyle = '#426449'; g.fillRect(-85*k,-65*k,170*k,145*k); g.fillStyle = '#c0ad8a';
-      g.fillRect(-80*k,-59.5*k,160*k,23*k); g.fillRect(-80*k,-36.5*k,22*k,77*k); g.fillRect(58*k,-36.5*k,22*k,77*k); g.restore();
-      if (labels) { const q = campusPoint(a,0,70); g.font = `600 ${Math.max(10,16*k)}px Arial, sans-serif`; g.fillStyle = '#f2e5c6'; g.textAlign = 'center'; g.fillText(a.name,q.x*k,q.z*k); }
-    }
+    const polygon=(points,color)=>{g.fillStyle=color;g.beginPath();points.forEach(([x,z],i)=>i?g.lineTo(x*k,z*k):g.moveTo(x*k,z*k));g.closePath();g.fill();};
+    for(const a of p.precincts){polygon(a.court,'#938f7e');for(const footprint of a.footprints)polygon(footprint,'#c0ad8a');}
+    if(labels)for(const a of p.precincts.filter(a=>['Convocation Hall','Great Library','Aviation Academy','School of Architecture'].includes(a.name))){const q=campusPoint(a,0,-65);g.font='600 10px Arial, sans-serif';g.fillStyle='#f2e5c6';g.textAlign='center';g.fillText(a.name,q.x*k,q.z*k);}
     const s=p.sports; g.fillStyle='#54815c'; g.fillRect(s.x*k,s.z*k,s.w*k,s.h*k);
     g.fillStyle='#eee6d0'; g.textAlign='center'; g.font=`600 ${Math.max(10,18*k)}px Arial,sans-serif`;
-    if(labels){ g.fillText('GVP AIRSTRIP',1100*k,3140*k); g.fillText('CAMPUS ENTRANCE',2160*k,3700*k); g.fillText('UNIVERSITY · NORTH',1500*k,-550*k); g.fillText('WEST COLLEGES',-555*k,1500*k); g.fillText('EAST CAMPUS',3560*k,1500*k); }
+    if(labels){ g.fillText('GVP AIRSTRIP',1100*k,3140*k); g.fillText('CAMPUS ENTRANCE',2160*k,3700*k); g.fillText('NORTH CAMPUS',1500*k,-900*k); g.fillText('WEST CAMPUS',-880*k,1500*k); g.fillText('EAST CAMPUS',3920*k,1500*k); }
   }
   draw(car, rings, target) {
     const c = this.canvas; const g = c.getContext('2d'); const W = c.width, H = c.height;

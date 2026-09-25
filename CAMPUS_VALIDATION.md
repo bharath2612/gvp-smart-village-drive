@@ -1,32 +1,38 @@
-# University expansion validation
+# University redesign validation
 
-Validated locally on 25 September 2026 with desktop headless Chrome, 1440 × 900, Medium quality. These are machine-specific observations, not a guarantee on other hardware.
+Tested 25 September 2026 with desktop Chrome, 1440 × 900, Medium quality. These observations describe this machine; they are not a cross-device performance guarantee.
 
-## Repeatable layout checks
+## Repeatable checks
 
-Run `node tools/test-campus.mjs`:
-- 18 quadrangle entrances connect to the closed campus loop.
-- Buildings remain outside the measured village and runway approach reservation.
-- New roads do not enter the fenced airfield.
-- Spawn, negative-coordinate road queries, reset positions and headings work around the loop.
-- Existing village zone lookup and plot-road filtering are preserved.
+- `npm run bake-campus`: compile road union/difference, with overlap assertions.
+- `npm run test:campus`: 94 independent buildings (20 north / 27 south / 23 east / 24 west), deterministic layout, actual rotated footprint separation, closed loop, runway reservation, outside spawn, road resets and unchanged village lookups.
+- 4,442 centreline coverage checks on baked pavement; all pass. Pairwise asphalt/pavers/kerb/sidewalk overlap remains below 0.002 m² per tile (rounding tolerance); largest measured residual: 0.000208 m².
+- `python tools/test-campus-browser.py` against `npm run dev`. Requires the Python Playwright package and Chrome or an installed Playwright Chromium. Optional `CHROME_BIN`, `CAMPUS_QA_URL`, `CAMPUS_QA_OUT`. Defaults write results/screenshots under `/tmp/gvp-campus-qa`.
 
-## Browser checks performed
+## Browser results
 
-- Clean startup; no uncaught browser errors. Measured plot counts unchanged.
-- Upward-facing campus road mesh normals.
-- 12,524 vehicle-envelope samples across roads (centre and both loop lanes): zero static collider obstructions.
-- Complete ~15.2 km lap using actual car simulation and steering: zero collisions or stuck resets.
-- Actual 157 m drives into all 18 quadrangles: zero collisions.
-- Drive through the village gate in both directions and through the airstrip gate.
-- Flight-to-car return over the west campus returns to the road below rather than the airstrip.
-- Existing runway takeoff: plane reached 60 m altitude, passed the east runway end, no collision.
-- Boat board/return, settings open/close, minimap click and full-map fast travel to the north campus.
-- Reset hotkey stays on the exterior road. Full map renders negative coordinates and the preserved airstrip.
-- Visual checks: arrival, library forecourt, loop corner, day/sunset/night lighting and southern airstrip overview.
+- No uncaught browser errors; existing measured village counts intact.
+- 15,290 car-envelope samples on road centres and both loop lanes: **zero obstructions**.
+- Actual car simulation into **all 94 forecourts**: zero impact/stuck events, no offroad-grip sections on the paved approaches.
+- Complete approximately 15.1 km campus lap with actual steering: **zero collisions or stuck resets**.
+- Village gate both directions and airstrip gate remain drivable.
+- Flight-to-car return places the car on a nearby campus road. Original runway takeoff reaches 60 m, clears the runway end and does not collide.
+- Boat enter/exit, minimap open, map travel to the north campus, outside road reset and settings open/close pass.
+- Visual inspection: hall arrival, library day/night, asphalt-to-paver junctions, west woodland, aerial campus shape, preserved runway and full map.
+- Additional trees and kerb side faces were inspected after the first visual pass. The final collision pass includes the tighter rotated building footprints.
 
 ## Rendering observations
 
-In a controlled render-view check (120 frames per view; first 30 discarded), ground views had a median frame interval of ~16.7 ms and 95th-percentile interval of ~18.1–18.3 ms. A broad aerial view was ~21 ms median / 22.8 ms p95. This is a render check, not a full cross-device gameplay benchmark.
+120 rendered frames per view, first 30 discarded. This measures rendering intervals in controlled views, not a full gameplay benchmark on every supported browser.
 
-Reducing submissions beyond the fog cut the library-facing day view from 2,391 to 712 draw calls, and the night view from 2,626 to 270. Long visibility is retained at altitude. The campus uses no new asset downloads and adds no real-time point lights.
+| View | Median (ms) | p95 (ms) | Draw calls |
+|---|---:|---:|---:|
+| library | 16.6 | 18.1 | 738 |
+| library-night | 16.6 | 18.2 | 328 |
+| junction | 16.7 | 18.0 | 189 |
+| west-grove | 16.7 | 18.2 | 613 |
+| overhead | 24.4 | 27.2 | 3969 |
+| airstrip | 16.7 | 17.8 | 1162 |
+| village | 16.7 | 18.2 | 713 |
+
+Ground views remain near 60 fps on the tested machine. The all-campus overview at 1,800 m (above the playable 900 m ceiling) costs about 24 ms per frame. No new real-time point lights, model downloads or texture packs were added. Geometry clipping runs during build, and distant detail is culled. Safari/Firefox, sustained gameplay and other hardware have not been re-benchmarked in this revision.

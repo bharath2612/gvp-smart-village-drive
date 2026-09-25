@@ -7,10 +7,17 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "copy-layout": "node tools/copy-layout.mjs"
+    "copy-layout": "node tools/copy-layout.mjs",
+    "bake-campus": "node tools/bake-university.mjs",
+    "predev": "npm run bake-campus",
+    "prebuild": "npm run bake-campus",
+    "test:campus": "node tools/test-campus.mjs"
   },
   "dependencies": {
     "three": "^0.180.0",
     "vite": "^7.3.6"
+  },
+  "devDependencies": {
+    "polygon-clipping": "0.15.7"
   }
 }

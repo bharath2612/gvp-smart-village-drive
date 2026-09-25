@@ -25,9 +25,9 @@ export function buildAirstrip(ctx) {
   ctx.airstrip = A;
 
   // Surfaces: runway, taxiway, apron, hangar floor, approach road, car park.
-  const asphalt = [patchGeo(RX0, RZ - RW / 2, RX1 - RX0, RW, 4, 0.03), patchGeo(RX1 - 2, RZ - 6, AX - AW / 2 - RX1 + 2, 12, 4, 0.03), patchGeo(1494, S + 1, 12, AZ - AD / 2 - S - 1 + 0.5, 4, 0.03)];
+  const asphalt = [patchGeo(RX0, RZ - RW / 2, RX1 - RX0, RW, 4, 0.03), patchGeo(RX1 - 2, RZ - 6, AX - AW / 2 - RX1 + 2, 12, 4, 0.03), patchGeo(1494, 3090, 12, AZ - AD / 2 - 3090, 4, 0.06)];
   const concrete = [patchGeo(AX - AW / 2, AZ - AD / 2, AW, AD, 5, 0.035), patchGeo(HX - HW / 2, HZ - HD / 2, HW, HD + 2, 5, 0.035), patchGeo(1512, 3158, 22, 14, 4, 0.03)];
-  paved.push({ x: RX0, y: RZ - RW / 2, w: RX1 - RX0, h: RW }, { x: RX1 - 2, y: RZ - 6, w: AX - AW / 2 - RX1 + 2, h: 12 }, { x: 1494, y: S, w: 12, h: AZ - AD / 2 - S + 1 }, { x: AX - AW / 2, y: AZ - AD / 2, w: AW, h: AD }, { x: HX - HW / 2, y: HZ - HD / 2, w: HW, h: HD + 2 }, { x: 1512, y: 3158, w: 22, h: 14 });
+  paved.push({ x: RX0, y: RZ - RW / 2, w: RX1 - RX0, h: RW }, { x: RX1 - 2, y: RZ - 6, w: AX - AW / 2 - RX1 + 2, h: 12 }, { x: 1494, y: 3090, w: 12, h: AZ - AD / 2 - 3090 }, { x: AX - AW / 2, y: AZ - AD / 2, w: AW, h: AD }, { x: HX - HW / 2, y: HZ - HD / 2, w: HW, h: HD + 2 }, { x: 1512, y: 3158, w: 22, h: 14 });
   const asph = new THREE.Mesh(merge(asphalt), stdMat(T, T.asphalt)); asph.receiveShadow = true; asph.name = 'airstrip-asphalt'; scene.add(asph);
   const conc = new THREE.Mesh(merge(concrete), stdMat(T, T.concrete)); conc.receiveShadow = true; conc.name = 'airstrip-concrete'; scene.add(conc);
   // Markings: threshold piano keys, centreline dashes, edge lines, apron parking box, road centreline.
@@ -35,7 +35,7 @@ export function buildAirstrip(ctx) {
   for (const [x0, dir] of [[RX0 + 6, 1], [RX1 - 6, -1]]) for (let i = 0; i < 8; i++) { const zz = RZ - RW / 2 + 1.5 + i * 2.8; white.push(patchGeo(dir > 0 ? x0 : x0 - 24, zz, 24, 1.5, 4, 0.05)); }
   for (let x = RX0 + 90; x < RX1 - 90; x += 50) white.push(patchGeo(x, RZ - 0.45, 30, 0.9, 4, 0.05));
   white.push(patchGeo(RX0 + 2, RZ - RW / 2 + 0.2, RX1 - RX0 - 4, 0.6, 4, 0.05)); white.push(patchGeo(RX0 + 2, RZ + RW / 2 - 0.8, RX1 - RX0 - 4, 0.6, 4, 0.05));
-  yellow.push(patchGeo(RX1 - 2, RZ - 0.25, AX - AW / 2 - RX1 + 4, 0.5, 4, 0.05)); yellow.push(patchGeo(1499.75, S + 1, 0.5, AZ - AD / 2 - S - 1, 4, 0.05));
+  yellow.push(patchGeo(RX1 - 2, RZ - 0.25, AX - AW / 2 - RX1 + 4, 0.5, 4, 0.05)); yellow.push(patchGeo(1499.75, 3090, 0.5, AZ - AD / 2 - 3090, 4, 0.075));
   for (let i = 0; i < 3; i++) yellow.push(patchGeo(AX - 24 + i * 16, AZ - 12, 0.4, 24, 4, 0.05));
   for (const [list, hex] of [[white, 0xf2f2ee], [yellow, 0xe8c547]]) { const m = new THREE.Mesh(merge(list), new THREE.MeshStandardMaterial({ color: hex, roughness: 0.9 })); m.receiveShadow = true; scene.add(m); }
   const n09 = flatText(12, 8, '09'); n09.position.set(RX0 + 52, 0.06, RZ); n09.rotation.z = -Math.PI / 2; scene.add(n09);

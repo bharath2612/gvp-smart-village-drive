@@ -33,6 +33,7 @@ import { PlaneVisual } from './plane/visual.js';
 import { buildAirstrip } from './world/airstrip.js';
 import { buildHorizon } from './world/horizon.js';
 import { buildUniversity } from './world/university.js';
+import { loadUniversityTrees } from './world/university-tree-models.js';
 import { Vehicles } from './game/vehicles.js';
 import { UI } from './ui/hud.js';
 import { buildRoadBoundary } from './world/road-boundary.js';
@@ -72,7 +73,8 @@ async function boot() {
     ['plant_bushDetailed', 1.1], ['flower_redA', 0.55], ['flower_yellowA', 0.55], ['flower_purpleA', 0.55], ['pot_large', 1.1], ['rock_largeA', 1.6], ['log_stack', 1.2], ['statue_column', 4],
   ].map(([key, height]) => ({ key, url: `/models/nature/${key}.glb`, height }));
   for (const [key, length] of [['sedan', 4.4], ['suv-luxury', 4.7], ['hatchback-sports', 4.2], ['van', 4.9], ['sedan-sports', 4.5], ['taxi', 4.5]]) MODEL_LIST.push({ key, url: `/models/cars/${key}.glb`, length });
-  const [models, carModel] = await Promise.all([loadModelSet(MODEL_LIST, (p) => ui.setLoading(0.03 + p * 0.1)), loadCarModel()]);
+  const [models, carModel, universityTrees] = await Promise.all([loadModelSet(MODEL_LIST, (p) => ui.setLoading(0.03 + p * 0.1)), loadCarModel(), loadUniversityTrees()]);
+  ctx.universityTrees = universityTrees;
   ctx.models = models; ctx.lodDistance = new URLSearchParams(location.search).get('lod') === 'off' ? 1e9 : CONFIG.lodDistance;
   console.log('[models] loaded', Object.keys(models).length, 'car', !!carModel);
   const steps = [

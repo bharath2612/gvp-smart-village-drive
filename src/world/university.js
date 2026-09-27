@@ -3,6 +3,7 @@ import { box,cyl,ico,merge,patchGeo,stdMat } from './geo.js';
 import { instancedChunks } from './instancing.js';
 import { textBoard } from './campus.js';
 import { canPlant,forestSites } from './university-forest.js';
+import { addUniversityTrees } from './university-tree-models.js';
 import { rng } from '../util/math.js';
 import { createCampusPlan,campusPoint,localRect,boundsOf,inBox,projectPath,pathSamples,insideCampus,inAirfield,nearestCampusRoad,registerCampus } from './university-plan.js';
 import { buildingGeometry,STONE,TRIM,DARK } from './university-buildings.js';
@@ -102,12 +103,13 @@ export function buildUniversity(ctx){
   const occupied=new Set();plan.treeSites=[];
   for(const t of trees){
     if(random()>ctx.qualityPreset.treeDensity)continue;const cell=`${Math.round(t.x/4)},${Math.round(t.z/4)}`;if(occupied.has(cell))continue;occupied.add(cell);
-    const s=(t.small ? .7 : 1.15)+random()*.4,sp=Math.floor(random()*species.length),tint=.8+random()*.2;
+    const s=(t.small ? .55 : ctx.universityTrees ? .85 : 1.15)+random()*.4,sp=Math.floor(random()*species.length),tint=.8+random()*.2;
     groups[sp].push({...t,rot:random()*Math.PI*2,sx:s,sy:s,sz:s,color:new THREE.Color(tint,tint,tint*.96)});
-    colliders.add(t.x-.55,t.z-.55,t.x+.55,t.z+.55,'tree','university-forest',15*s);plan.treeSites.push({x:t.x,z:t.z});count++;
+    colliders.add(t.x-.8*s,t.z-.8*s,t.x+.8*s,t.z+.8*s,'tree','university-forest',(ctx.universityTrees?[16,20,15,16][sp]:15)*s);plan.treeSites.push({x:t.x,z:t.z});count++;
   }
   const treeMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1});
-  groups.forEach((items,i)=>{
+  if(ctx.universityTrees)addUniversityTrees(ctx,root,groups);
+  else groups.forEach((items,i)=>{
     const size=ctx.models[species[i]]?.size||new THREE.Vector3(7,10,7);
     const fallback=merge([cyl(.25,.4,size.y*.5,5,0x65523a),ico(1,0,palette[i],{y:size.y*.65,sx:size.x*.55,sy:size.y*.38,sz:size.z*.55})]);
     const geo=(ctx.models[species[i]]?.geo||fallback).clone(),colors=geo.attributes.color,c=new THREE.Color(),base=new THREE.Color(palette[i]);

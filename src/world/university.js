@@ -16,7 +16,7 @@ export function buildUniversity(ctx){
   const mats={stone:stdMat(T,T.stone,{vertexColors:true,emissive:0xffd6a3,emissiveIntensity:0}),trim:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8,emissive:0xffdfb0,emissiveIntensity:0}),roof:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8}),glass:new THREE.MeshStandardMaterial({vertexColors:true,roughness:.24,metalness:.25,emissive:0xffd39a,emissiveIntensity:0}),glow:ctx.lampHeadMat};ctx.universityMats=mats;
   const mesh=(g,mat,name)=>{if(!g)return;const m=new THREE.Mesh(g,mat);m.name=name;m.receiveShadow=true;root.add(m);return m;};
   const instances=(g,mat,items,name,shadow=false)=>{const r=instancedChunks(g,mat,items,{name,chunk:350,castShadow:shadow,receiveShadow:true});root.add(r);return r;};
-  // The road is the campus edge: woodland ground stops at its inner boundary.
+  // Woodland follows the estate boundary, independently of the campus roads.
   const landMat=stdMat(T,T.grass,{color:0x84996b});
   landMat.onBeforeCompile=shader=>{
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec2 vEstate;').replace('#include <begin_vertex>','#include <begin_vertex>\nvEstate=position.xz;');
@@ -30,17 +30,31 @@ export function buildUniversity(ctx){
   const treeSafe=(x,z)=>canPlant(plan,x,z);
   for(const road of plan.roads){
     if(!road.drive)for(const p of pathSamples(road,14)){
-      if(nearOther(road,p.x,p.z,14)||road.id==='gate-link')continue;
+      if(nearOther(road,p.x,p.z,14)||road.roundabout)continue;
       const g=patchGeo(-2.7,-.1,5.4,.2,4,.075);g.rotateY(-Math.atan2(p.dz,p.dx));g.translate(p.x,0,p.z);marks.push(g);
     }
     for(const p of pathSamples(road,road.drive?35:46))for(const side of [-1,1]){
       const off=road.width/2+1.65,x=p.x+p.nx*off*side,z=p.z+p.nz*off*side;
-      if(nearOther(road,x,z,9)||inAirfield(plan,x,z,10)||footprintBlocked(x,z,4)||plan.precincts.some(b=>inBox(b.courtBox,x,z,2))||road.id==='gate-link')continue;
+      if(nearOther(road,x,z,9)||inBox(plan.airfield,x,z,10)||footprintBlocked(x,z,4)||plan.precincts.some(b=>inBox(b.courtBox,x,z,2)))continue;
       lamps.push({x,z});lights.push({x,z,r:17});colliders.add(x-.2,z-.2,x+.2,z+.2,'lamp',null,7);
     }
-    if(road.loop)for(const p of pathSamples(road,19))for(const side of [-1,1]){
+    if(road.width===25&&!road.roundabout)for(const p of pathSamples(road,19))for(const side of [-1,1]){
       if(random()<.22)continue;const off=23+random()*15,x=p.x+p.nx*off*side,z=p.z+p.nz*off*side;
       if(treeSafe(x,z))trees.push({x,z});
+    }
+  }
+  // Matching edge lines and directional arrows make both avenues visibly two-way.
+  for(const road of plan.roads.filter(r=>r.width>=25)){
+    for(const p of pathSamples(road,4))for(const side of [-1,1]){
+      const x=p.x+p.nx*(road.width/2-1)*side,z=p.z+p.nz*(road.width/2-1)*side;
+      if(nearOther(road,x,z,4))continue;
+      const g=patchGeo(-2,-.09,4.05,.18,4,.08);g.rotateY(-Math.atan2(p.dz,p.dx));g.translate(x,0,z);marks.push(g);
+    }
+    for(const p of pathSamples(road,road.roundabout?94:140))for(const side of road.roundabout?[0]:[-1,1]){
+      if(!road.roundabout&&(p.at<35||nearOther(road,p.x,p.z,25)))continue;
+      const x=p.x+p.nx*road.width*.23*side,z=p.z+p.nz*road.width*.23*side;
+      const arrow=merge([patchGeo(-2.5,-.18,4,.36,4,.08),patchGeo(-1.2,-.16,2.4,.32,4,.08).rotateY(Math.PI/4).translate(1.4,0,-.7),patchGeo(-1.2,-.16,2.4,.32,4,.08).rotateY(-Math.PI/4).translate(1.4,0,.7)]);
+      arrow.rotateY(-Math.atan2(p.dz,p.dx)+(road.roundabout||side>0?Math.PI:0));arrow.translate(x,0,z);marks.push(arrow);
     }
   }
   mesh(merge(marks),new THREE.MeshStandardMaterial({color:0xe9e4d5,roughness:1}),'university-markings');
@@ -65,6 +79,11 @@ export function buildUniversity(ctx){
   }
   // Individual forecourts: separate planted edges, occasional basins and small garden seats.
   const lawnMat=stdMat(T,T.lawn);
+  for(const q of plan.roundabouts){
+    mesh(cyl(34,34,.12,64,0x77925a,{x:q.x,y:.06,z:q.z}),lawnMat,`${q.id}-garden`);
+    for(let i=0;i<20;i++){const a=i*Math.PI/10;bushes.push({x:q.x+28*Math.cos(a),z:q.z+28*Math.sin(a)});}
+    trees.push({x:q.x,z:q.z});
+  }
   for(let i=0;i<plan.precincts.length;i++){
     const p=plan.precincts[i];
     for(const side of [-1,1]){
@@ -87,14 +106,13 @@ export function buildUniversity(ctx){
   const goals=[];for(const z of [sp.z+5,sp.z+sp.h-5]){for(const x of [sp.x+sp.w/2-4,sp.x+sp.w/2+4]){goals.push(box(.15,3,.15,0xffffff,{x,z}));colliders.add(x-.15,z-.15,x+.15,z+.15,'sign',null,3);}goals.push(box(8,.15,.15,0xffffff,{x:sp.x+sp.w/2,y:3,z}));}mesh(merge(goals),mats.trim,'university-goals');
   for(const x of [sp.x-6,sp.x+sp.w+6])for(const z of [sp.z+14,sp.z+sp.h-14]){lamps.push({x,z});lights.push({x,z,r:40});}
   (plan.pools ||= []).push({x:sp.x+sp.w/2,z:sp.z+sp.h/2,sx:75,sz:120});
-  // Bring the arrival gate and lodge inside the road boundary as well.
-  const gateShift=plan.gate.z-3660;
-  const entrance=[];for(const x of [2145,2175]){entrance.push(box(5,12,5,STONE,{x,z:3660}),box(6,.8,6,TRIM,{x,y:12.4,z:3660}));colliders.add(x-2.5,3657.5+gateShift,x+2.5,3662.5+gateShift,'gate',null,13);}
-  entrance.push(box(35,2.2,4,STONE,{x:2160,y:12.2,z:3660}),box(36,.4,5,TRIM,{x:2160,y:13.5,z:3660}));mesh(merge(entrance).translate(0,0,gateShift),mats.stone,'university-entry');
-  for(const side of [-1,1]){const sign=textBoard(28,1.7,['GVP UNIVERSITY'],'#333e3b','#f2e5c6','600 64px Georgia, serif');sign.position.set(2160,12.2,3660+gateShift+side*2.05);sign.rotation.y=side<0?Math.PI:0;root.add(sign);}
-  const lodge=mesh(merge([box(12,4.5,9,STONE,{x:2194,z:3653}),box(13,.5,10,TRIM,{x:2194,y:4.7,z:3653}),box(.1,2,5,DARK,{x:2187.9,y:2.5,z:3653})]),mats.stone,'university-lodge');lodge.position.z=gateShift;lodge.castShadow=true;colliders.add(2188,3648.5+gateShift,2200,3657.5+gateShift,'amenity',null,5);
-  const junction=projectPath(plan.roads[0],2160,3400);
-  for(const [x,z,text,rot]of [[2177,junction.z-23,'CAMPUS DRIVE · VILLAGE ↑',Math.PI],[2176,3080,'← VILLAGE & GVP AIRSTRIP',0],[1520,3070,'UNIVERSITY CAMPUS →',0]]){const sign=textBoard(10,1.4,[text],'#304940','#f2e5c6','600 64px Arial,sans-serif');sign.position.set(x,3,z);sign.rotation.y=rot;root.add(sign);}
+  const {x:gx,z:gz,width:gw}=plan.gate;
+  const entrance=[];for(const side of [-1,1]){const x=gx+side*(gw/2+4);entrance.push(box(5,12,5,STONE,{x,z:gz}),box(6,.8,6,TRIM,{x,y:12.4,z:gz}));colliders.add(x-2.5,gz-2.5,x+2.5,gz+2.5,'gate',null,13);}
+  entrance.push(box(gw+13,2.2,4,STONE,{x:gx,y:12.2,z:gz}),box(gw+14,.4,5,TRIM,{x:gx,y:13.5,z:gz}));mesh(merge(entrance),mats.stone,'university-entry');
+  for(const side of [-1,1]){const sign=textBoard(32,1.7,['GVP UNIVERSITY'],'#333e3b','#f2e5c6','600 64px Georgia, serif');sign.position.set(gx,12.2,gz+side*2.05);sign.rotation.y=side<0?Math.PI:0;root.add(sign);}
+  const lx=gx+gw/2+22,lz=gz-7;
+  const lodge=mesh(merge([box(12,4.5,9,STONE,{x:lx,z:lz}),box(13,.5,10,TRIM,{x:lx,y:4.7,z:lz}),box(.1,2,5,DARK,{x:lx-6.1,y:2.5,z:lz})]),mats.stone,'university-lodge');lodge.castShadow=true;colliders.add(lx-6,lz-4.5,lx+6,lz+4.5,'amenity',null,5);
+  for(const [x,z,text,rot]of [[1536,3410,'← WEST CAMPUS · EAST CAMPUS →',0],[1536,3330,'VILLAGE GATE ↑',0],[1462,3075,'← GVP AIRSTRIP',0]]){const sign=textBoard(14,1.4,[text],'#304940','#f2e5c6','600 64px Arial,sans-serif');sign.position.set(x,3,z);sign.rotation.y=rot;root.add(sign);}
   const benchGeo=merge([box(3.3,.2,.8,0x71563c,{y:.7}),box(3.3,.8,.12,0x71563c,{y:1.1,z:.4}),box(.18,.65,.65,DARK,{x:-1.2}),box(.18,.65,.65,DARK,{x:1.2})]);instances(benchGeo,new THREE.MeshStandardMaterial({vertexColors:true}),benches,'university-benches',true);
   instances(merge([cyl(2.6,2.6,.65,24,TRIM,{y:.325}),cyl(.5,.8,1.3,12,STONE,{y:.9})]),mats.trim,basins,'university-basins',true);
   instances(cyl(2.3,2.3,.08,24,0x568b98,{y:.68}),new THREE.MeshStandardMaterial({vertexColors:true,metalness:.4,roughness:.2}),basins,'university-basin-water');

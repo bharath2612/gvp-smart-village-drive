@@ -6,7 +6,7 @@ import { instancedChunks } from './instancing.js';
 export function buildWall(ctx) {
   const { scene, T, colliders } = ctx;
   const S = CONFIG.world.size, H = CONFIG.world.wallHeight, TH = CONFIG.world.wallThickness;
-  const gx = CONFIG.world.gate.x, gateW = 14;
+  const gx = CONFIG.world.gate.x, gateW = 50;
   const parts = [];
   // North, west, east walls full length; south wall in two pieces around the gate.
   parts.push(box(S + TH * 2, H, TH, 0xd8d3c8, { x: S / 2, z: -TH / 2 }));
@@ -16,7 +16,7 @@ export function buildWall(ctx) {
   parts.push(box(S - gx - gateW / 2, H, TH, 0xd8d3c8, { x: gx + gateW / 2 + (S - gx - gateW / 2) / 2, z: S + TH / 2 }));
   // Coping strip on top.
   parts.push(box(S + 1, 0.25, TH + 0.4, 0xbfb9ad, { x: S / 2, y: H + 0.12, z: -TH / 2 }));
-  parts.push(box(S + 1, 0.25, TH + 0.4, 0xbfb9ad, { x: S / 2, y: H + 0.12, z: S + TH / 2 }));
+  for(const [x,w]of [[(gx-gateW/2)/2,gx-gateW/2],[gx+gateW/2+(S-gx-gateW/2)/2,S-gx-gateW/2]])parts.push(box(w,.25,TH+.4,0xbfb9ad,{x,y:H+.12,z:S+TH/2}));
   parts.push(box(TH + 0.4, 0.25, S + 1, 0xbfb9ad, { x: -TH / 2, y: H + 0.12, z: S / 2 }));
   parts.push(box(TH + 0.4, 0.25, S + 1, 0xbfb9ad, { x: S + TH / 2, y: H + 0.12, z: S / 2 }));
   const wall = new THREE.Mesh(merge(parts), stdMat(T, T.concrete, { vertexColors: true }));

@@ -5,6 +5,7 @@ import { CONFIG } from '../config.js';
 import { patchGeo, box, cyl, merge, stdMat } from './geo.js';
 import { textBoard } from './campus.js';
 import { PlaneVisual } from '../plane/visual.js';
+import { AIRSTRIP_OFFSET_X } from './airstrip-plan.js';
 
 function colour(geo, hex) { const c = new THREE.Color(hex); const arr = new Float32Array(geo.attributes.position.count * 3); for (let i = 0; i < arr.length; i += 3) { arr[i] = c.r; arr[i + 1] = c.g; arr[i + 2] = c.b; } geo.setAttribute('color', new THREE.BufferAttribute(arr, 3)); return geo; }
 function flatText(w, h, text, fg = '#ffffff') {
@@ -15,7 +16,9 @@ function flatText(w, h, text, fg = '#ffffff') {
 }
 
 export function buildAirstrip(ctx) {
-  const { scene, T, colliders } = ctx;
+  const { scene:worldScene, T, colliders:worldColliders } = ctx;
+  const scene=new THREE.Group();scene.name='airstrip';scene.position.x=AIRSTRIP_OFFSET_X;worldScene.add(scene);
+  const colliders={add:(x0,z0,x1,z1,...args)=>worldColliders.add(x0+AIRSTRIP_OFFSET_X,z0,x1+AIRSTRIP_OFFSET_X,z1,...args)};
   const S = CONFIG.world.size;
   const RZ = S + 180, RX0 = 800, RX1 = 1400, RW = 23;              // runway centreline and extent
   const AX = 1480, AZ = RZ, AW = 60, AD = 40;                        // apron centre and size
@@ -105,4 +108,7 @@ export function buildAirstrip(ctx) {
   // Direction sign at the gate.
   const gs = textBoard(4, 1, ['GVP AIRSTRIP  →'], '#1e4fa3', '#ffffff', 'bold 60px Inter, sans-serif'); gs.position.set(1509, 2.6, S + 30); gs.rotation.y = Math.PI; scene.add(gs);
   const gpost = new THREE.Mesh(cyl(0.05, 0.06, 2.2, 6, 0x8b949e, { x: 1509, y: 1.1, z: S + 30 }), new THREE.MeshStandardMaterial({ vertexColors: true })); scene.add(gpost);
+  // Gameplay, lighting and paving queries use world coordinates like the translated meshes.
+  for(const q of [A.threshold,A.threshold27,A.apron,A.park,A.hangarPrompt,...paved,...pools])q.x+=AIRSTRIP_OFFSET_X;
+  A.runway.x0+=AIRSTRIP_OFFSET_X;A.runway.x1+=AIRSTRIP_OFFSET_X;
 }

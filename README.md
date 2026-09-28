@@ -5,7 +5,7 @@ Browser driving game over the full 3 km × 3 km GVP Smart Village master plan at
 **Play:** https://gvp-smart-village-drive.vercel.app
 
 - Vite + Three.js, no framework. Fixed 120 Hz arcade car simulation, 2D collision grid, instanced procedural buildings.
-- The winding ~15.1 km campus loop is the university boundary. All 46 independent classical buildings sit inside it, along the entrance/front and lower left/right sides. The rear half is woodland; more than 21,000 trees at Medium quality fill plantable campus land, with varied species/green tones and clear routes, forecourts and runway approaches. Outside the loop is bare soil. The car starts at Convocation Hall; map navigation, village access and the aircraft remain available. The campus is a designed expansion, separate from the measured CAD layout.
+- The car starts on a straight 50 m two-way approach to the village gate. Matching 25 m west/east campus roads branch from it, each ending at a landscaped roundabout (60 m centreline radius) for the return trip. The irregular woodland boundary is independent of the roads. The 31 classical campus buildings face the shorter routes; the rear half remains dense woodland. The airstrip, its aircraft, fences and gameplay locations move together 120 m west to clear the main approach, with a dedicated access road. The measured village layout is unchanged.
 - Three vehicles: the SUV, a motor boat on the lake (press B at the marina gate) and a Cessna 172 style charter plane at GVP Airstrip outside the main gate (press F at the hangar, or Settings → Vehicle → Charter plane). The plane has an arcade-real flight model (lift, drag, thrust, stall, flaps, assists), four cameras including a live cockpit panel, a Sky tour mission, a soft boundary 2 km beyond the wall and a 900 m ceiling.
 - Textures and sounds are generated in the browser (canvas noise textures, Web Audio synthesis). Trees, the SUV, parked cars and small props are CC0 low-poly GLBs from the Kenney Nature Kit and Car Kit (`node tools/fetch-assets.mjs`, ~1.7 MB), baked into vertex-coloured geometry and instanced. No additional model or texture packs are needed for the campus.
 - Want your own SUV? Drop a GLB at `public/models/suv.glb` (wheels as nodes named `wheel-front-*` / `wheel-back-*`); the paint is recoloured to the brand colour automatically.
@@ -22,7 +22,7 @@ Controls: W/S throttle & brake, A/D steer, Space handbrake, Shift boost, E swap 
 
 See `DRIVE_GAME_SPEC.md` for the full specification, engineering review and test plan.
 
-Campus layout and pavement regression checks: `npm run test:campus`. Roads are unioned and clipped at build time (`npm run bake-campus`, also run automatically before dev/build), so intersecting streets share one pavement boundary. Browser route, map, flight and lighting checks are documented in `CAMPUS_VALIDATION.md`.
+Campus layout and pavement regression checks: `npm run test:campus`. `npm run test:campus-routes` builds the actual road, gate, airstrip, building and tree colliders, checks both lanes and both gate connections, and simulates the complete trip along each branch and around its roundabout with road-boundary collisions enabled. Roads are unioned and clipped at build time (`npm run bake-campus`, also run automatically before dev/build), so intersecting streets share one pavement boundary. Browser route, map, flight and lighting checks are documented in `CAMPUS_VALIDATION.md`.
 
 
 ### Road-boundary collisions
@@ -53,4 +53,4 @@ ROAD_BOUNDARY_QA=1 python tools/test-campus-browser.py
 The browser checks exercise mouse/keyboard switches, persistence/defaults, both
 on/off driving, every village road, occupied recovery, swaps, vehicle transitions,
 parking access, all cached surface tiles and CPU timings. The campus suite adds
-all 46 building drives, a complete loop, takeoff, boating and map travel.
+all building drives, both campus return routes, takeoff, boating and map travel.

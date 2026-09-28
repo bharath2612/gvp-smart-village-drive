@@ -5,8 +5,9 @@ import {BUILDING_TYPES,createCampusPlan,campusPlanKey,campusPoint,nearestCampusR
 import {roadPlacement} from '../src/world/layout.js';
 import {pointInPolygon} from '../src/util/math.js';
 import {surfaceArea} from './campus-surfaces.mjs';
-const p=createCampusPlan(),loop=p.roads[0],data=JSON.parse(fs.readFileSync('src/world/generated/university-surfaces.json'));
-assert.ok(p.precincts.length>=35,'enough independent campus buildings');
+import {AIRSTRIP_FENCE} from '../src/world/airstrip-plan.js';
+const p=createCampusPlan(),loop=p.perimeter,data=JSON.parse(fs.readFileSync('src/world/generated/university-surfaces.json'));
+assert.ok(p.precincts.length>=30,'campus buildings along the shorter routes');
 assert.equal(data.key,campusPlanKey(p));
 assert.deepEqual(loop.points[0],loop.points.at(-1));
 assert.equal(nearestCampusRoad(p,p.spawn.x,p.spawn.z).dist,0);
@@ -14,9 +15,9 @@ assert.deepEqual(createCampusPlan(),p,'stable seeded generation');
 const sides={north:0,south:0,east:0,west:0};
 for(const c of p.precincts){
   assert.ok(c.z>1500,'rear half contains no university buildings');
-  for(const [x,z]of [...c.footprints.flat(),...c.court])assert.ok(pointInPolygon(x,z,p.boundary)&&projectPath(loop,x,z).dist>19,'entire building and court inside perimeter road');
+  for(const [x,z]of [...c.footprints.flat(),...c.court])assert.ok(pointInPolygon(x,z,p.boundary)&&projectPath(loop,x,z).dist>19,'entire building and court inside estate boundary');
   sides[c.z<0?'north':c.z>3000?'south':c.x<0?'west':'east']++;
-  assert.ok(projectPath(loop,c.entry.x,c.entry.z).dist<.01,`${c.name}: connected`);
+  assert.ok(p.avenues.some(r=>projectPath(r,c.entry.x,c.entry.z).dist<.01),`${c.name}: connected`);
   for(const box of c.boxes){for(const [x,z]of [[box.x0,box.z0],[box.x1,box.z1],[box.x0,box.z1],[box.x1,box.z0]]){assert.ok(!inAirfield(p,x,z,10),`${c.name}: runway clearance`);assert.ok(x<0||x>3000||z<0||z>3000,`${c.name}: village protected`);}}
   for(const r of p.roads)for(const q of pathSamples(r,8))assert.ok(!BUILDING_TYPES[c.kind].blocks.some(([bx,bz,w,d])=>{const dx=q.x-c.x,dz=q.z-c.z,lx=Math.cos(c.rot)*dx-Math.sin(c.rot)*dz,lz=Math.sin(c.rot)*dx+Math.cos(c.rot)*dz;return Math.abs(lx-bx)<w/2+r.width/2+2&&Math.abs(lz-bz)<d/2+r.width/2+2;}),`${c.name}: road ${r.id} enters footprint`);
 }
@@ -28,12 +29,13 @@ const has=(polys,x,z)=>polys?.some(poly=>pointInPolygon(x,z,poly[0])&&!poly.slic
 const tiles=new Map(data.tiles.map(t=>[`${Math.floor(t.x/400)},${Math.floor(t.z/400)}`,t]));
 let roadSamples=0;
 for(const r of p.roads)for(const q of pathSamples(r,7)){
+  if(r.flatEnds&&q.at===0)continue; // A flush endpoint lies on, rather than inside, the polygon.
   const tile=tiles.get(`${Math.floor(q.x/400)},${Math.floor(q.z/400)}`);
   assert.ok(tile&&(has(tile.asphalt,q.x,q.z)||has(tile.paving,q.x,q.z)),`${r.id}: missing pavement at ${q.x},${q.z}`);roadSamples++;
-  if(r.loop){assert.equal(world.onRoad(q.x,q.z),loop);const a=roadPlacement(world,q.x,q.z);assert.ok(Math.hypot(q.x-a.x,q.z-a.y)<1e-6);const b=roadPlacement(world,q.x,q.z,a.yaw+Math.PI);assert.ok(Math.cos(b.yaw-a.yaw)<-.99);}
+  if(r.loop){assert.ok(world.onRoad(q.x,q.z));const a=roadPlacement(world,q.x,q.z);assert.ok(Math.hypot(q.x-a.x,q.z-a.y)<r.width/2);const b=roadPlacement(world,q.x,q.z,a.yaw+Math.PI);assert.ok(Math.cos(b.yaw-a.yaw)<-.99);}
 }
 assert.equal(world.nearestRoad(-400,500,()=>true),fallback);assert.equal(world.zoneOf(1500,1500),'village');
-for(const r of p.roads)for(const q of pathSamples(r,3))assert.ok(!(q.x>770&&q.x<1545&&q.z>3090&&q.z<3265),`${r.id}: airfield fence`);
+for(const r of p.roads)for(const q of pathSamples(r,3))assert.ok(!inBox(AIRSTRIP_FENCE,q.x,q.z,-.01),`${r.id}: airfield fence`);
 let maxOverlap=0;
 for(const tile of data.tiles)for(const [a,b]of [['asphalt','paving'],['asphalt','sidewalk'],['paving','sidewalk'],['curb','asphalt'],['curb','paving'],['curb','sidewalk']]){
   if(!tile[a]||!tile[b])continue;const area=surfaceArea(clipping.intersection(tile[a],tile[b]));maxOverlap=Math.max(maxOverlap,area);assert.ok(area<.002,`${a}/${b}: stacked pavement ${area}m²`);

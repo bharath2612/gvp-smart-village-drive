@@ -1,5 +1,6 @@
 // North-up minimap drawn from layout.json on a canvas; full-screen map with plot labels.
 import { campusPoint } from '../world/university-plan.js';
+import { AIRSTRIP_OFFSET_X } from '../world/airstrip-plan.js';
 
 export class Minimap {
   constructor(world, canvas, bigCanvas) {
@@ -61,13 +62,15 @@ export class Minimap {
     for(let i=0;i<(p.treeSites?.length||0);i+=3){const q=p.treeSites[i];g.fillStyle=['#395b3c','#45653e','#2a4533'][i%7%3];g.beginPath();g.arc(q.x*k,q.z*k,5*k,0,Math.PI*2);g.fill();}
     for (const r of p.roads) { g.strokeStyle = '#b9b6a8'; g.lineWidth = Math.max(2, r.width * k); g.beginPath(); r.points.forEach((q, i) => i ? g.lineTo(q.x * k, q.z * k) : g.moveTo(q.x * k, q.z * k)); g.stroke(); }
     // Runway, apron and airstrip connector are preserved on the enlarged map.
-    g.fillStyle = '#798894'; g.fillRect(800*k,3168.5*k,600*k,23*k); g.fillRect(1398*k,3174*k,82*k,12*k); g.fillRect(1450*k,3160*k,60*k,40*k); g.fillRect(1494*k,3000*k,12*k,160*k);
+    g.save();g.translate(AIRSTRIP_OFFSET_X*k,0);
+    g.fillStyle = '#798894'; g.fillRect(800*k,3168.5*k,600*k,23*k); g.fillRect(1398*k,3174*k,82*k,12*k); g.fillRect(1450*k,3160*k,60*k,40*k); g.fillRect(1494*k,3090*k,12*k,70*k);
+    g.restore();
     const polygon=(points,color)=>{g.fillStyle=color;g.beginPath();points.forEach(([x,z],i)=>i?g.lineTo(x*k,z*k):g.moveTo(x*k,z*k));g.closePath();g.fill();};
     for(const a of p.precincts){polygon(a.court,'#938f7e');for(const footprint of a.footprints)polygon(footprint,'#c0ad8a');}
     if(labels)for(const a of p.precincts.filter(a=>['Convocation Hall','Great Library','Aviation Academy','School of Architecture'].includes(a.name))){const q=campusPoint(a,0,-65);g.font='600 10px Arial, sans-serif';g.fillStyle='#f2e5c6';g.textAlign='center';g.fillText(a.name,q.x*k,q.z*k);}
     const s=p.sports; g.fillStyle='#54815c'; g.fillRect(s.x*k,s.z*k,s.w*k,s.h*k);
     g.fillStyle='#eee6d0'; g.textAlign='center'; g.font=`600 ${Math.max(10,18*k)}px Arial,sans-serif`;
-    if(labels){ g.fillText('GVP AIRSTRIP',1100*k,3140*k); g.fillText('CAMPUS ENTRANCE',2160*k,3390*k); g.fillText('NORTH WOODLAND',1500*k,-290*k); g.fillText('WEST WOODLAND',-260*k,850*k); g.fillText('EAST WOODLAND',3240*k,900*k); }
+    if(labels){ g.fillText('GVP AIRSTRIP',(1100+AIRSTRIP_OFFSET_X)*k,3140*k); g.fillText('CAMPUS ENTRANCE',p.gate.x*k,(p.gate.z+95)*k); g.fillText('NORTH WOODLAND',1500*k,-290*k); g.fillText('WEST WOODLAND',-260*k,850*k); g.fillText('EAST WOODLAND',3240*k,900*k); for(const q of p.roundabouts)g.fillText('TURNAROUND',q.x*k,(q.z-95)*k); }
   }
   draw(car, rings, target) {
     const c = this.canvas; const g = c.getContext('2d'); const W = c.width, H = c.height;

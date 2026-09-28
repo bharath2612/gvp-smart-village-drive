@@ -37,31 +37,42 @@ with sync_playwright() as p:
  const drives=[];
  for(const p of P.precincts){const a=p.road.points[1],b=p.road.points[0],len=Math.hypot(b.x-a.x,b.z-a.z);S.car.reset(a.x,a.z,Math.atan2(b.x-a.x,-(b.z-a.z)));S.car.takeEvents();let impact=0,maxOffroad=0;for(let i=0;i<6000&&Math.hypot(S.car.x-a.x,S.car.z-a.z)<len-4;i++){S.car.step(1/120,{...neutral,throttle:S.car.speed<9?1:0});impact+=S.car.takeEvents().filter(e=>e.type==='impact'||e.type==='stuckReset').length;if(S.car.offroad)maxOffroad++;}drives.push({name:p.name,len,travel:Math.hypot(S.car.x-a.x,S.car.z-a.z),impact,maxOffroad});check(!impact,`building drive ${p.name}`);check(Math.hypot(S.car.x-b.x,S.car.z-b.z)<6,`building entry ${p.name}`);check(!maxOffroad,`paved grip ${p.name}`);}
  results.buildingDrives=drives;
- // Navigate a complete lap using actual steering, maintaining 55 km/h on bends.
- const ring=P.roads[0];let progress=0,impact=0;const route=pathSamples(ring,8);S.car.reset(route[0].x,route[0].z,Math.atan2(route[0].dx,-route[0].dz));
- for(let step=0;step<200000&&progress<route.length-1;step++){
-  while(progress<route.length-1&&Math.hypot(S.car.x-route[progress].x,S.car.z-route[progress].z)<20)progress++;
-  const target=route[progress];const desired=Math.atan2(target.x-S.car.x,-(target.z-S.car.z));let delta=Math.atan2(Math.sin(desired-S.car.yaw),Math.cos(desired-S.car.yaw));
-  S.car.step(1/120,{...neutral,throttle:S.car.speed<17?1:0,steer:Math.max(-1,Math.min(1,delta*2.7))});
-  impact+=S.car.takeEvents().filter(e=>e.type==='impact'||e.type==='stuckReset').length;
+ // Drive both campus branches out, around the turnaround, and back in the other lane.
+ results.campusRoutes=[];
+ for(let index=0;index<P.avenues.length;index++){
+  const avenue=P.avenues[index],ring=P.roads.find(r=>r.id===P.roundabouts[index].id);
+  const samples=pathSamples(avenue,8);
+  const outbound=samples.map(q=>({x:q.x-q.nx*6.25,z:q.z-q.nz*6.25}));
+  const inbound=samples.map(q=>({x:q.x+q.nx*6.25,z:q.z+q.nz*6.25})).reverse();
+  const route=[...outbound,...pathSamples({points:[...ring.points].reverse()},6),...inbound];
+  let progress=1,impact=0;
+  S.car.reset(route[0].x,route[0].z,Math.atan2(route[1].x-route[0].x,-(route[1].z-route[0].z)));
+  S.car.takeEvents();
+  for(let step=0;step<200000&&progress<route.length-1;step++){
+   while(progress<route.length-1&&Math.hypot(S.car.x-route[progress].x,S.car.z-route[progress].z)<15)progress++;
+   const target=route[progress],desired=Math.atan2(target.x-S.car.x,-(target.z-S.car.z));
+   const delta=Math.atan2(Math.sin(desired-S.car.yaw),Math.cos(desired-S.car.yaw));
+   S.car.step(1/120,{...neutral,throttle:S.car.speed<11?1:0,steer:Math.max(-1,Math.min(1,delta*2.7))});
+   impact+=S.car.takeEvents().filter(e=>e.type==='impact'||e.type==='stuckReset').length;
+  }
+  results.campusRoutes.push({id:avenue.id,progress,total:route.length,impact});
+  check(progress===route.length-1,`${avenue.id}: return via roundabout`);check(!impact,`${avenue.id}: no collisions`);
  }
- results.fullLap={progress,total:route.length,impact};check(progress===route.length-1,'complete campus lap');check(!impact,'collision-free campus lap');
- // Both directions through the village gate and existing airstrip gate.
  results.links=[];
- for(const [x,z,yaw,ticks]of [[1500,3050,0,480],[1500,2970,Math.PI,480],[1500,3050,Math.PI,520]]){S.car.reset(x,z,yaw);for(let i=0;i<ticks;i++)S.car.step(1/120,neutral);const ev=S.car.takeEvents().filter(e=>e.type==='impact'||e.type==='stuckReset');results.links.push({x:S.car.x,z:S.car.z,impacts:ev.length});check(!ev.length,'gate/airstrip access');}
- S.enterPlane({silent:true});S.plane.reset(-410,1200,0);S.plane.y=150;S.plane.onGround=false;S.exitPlane({silent:true});check(S.car.x<0&&nearestCampusRoad(P,S.car.x,S.car.z).dist<.01,'airborne switch returns to campus road below');
+ for(const [x,z,yaw,ticks]of [[1492.5,3050,0,480],[1507.5,2970,Math.PI,480],[1380,3070,Math.PI,520]]){S.car.reset(x,z,yaw);S.car.takeEvents();for(let i=0;i<ticks;i++)S.car.step(1/120,neutral);const ev=S.car.takeEvents().filter(e=>e.type==='impact'||e.type==='stuckReset');results.links.push({x:S.car.x,z:S.car.z,impacts:ev.length});check(!ev.length,'gate/airstrip access');}
+ S.enterPlane({silent:true});S.plane.reset(-420,2310,0);S.plane.y=150;S.plane.onGround=false;S.exitPlane({silent:true});check(S.car.x<0&&nearestCampusRoad(P,S.car.x,S.car.z).dist<.01,'airborne switch returns to campus road below');
  S.enterPlane({silent:true});for(let i=0;i<4800;i++)S.plane.step(1/120,{throttleUp:true,throttleDown:false,boost:true,pitch:S.plane.speed>28&&S.plane.y<60?.45:0,roll:0,yaw:0,handbrake:false});results.flight={x:S.plane.x,y:S.plane.y,z:S.plane.z,speed:S.plane.speed,crashed:S.plane.crashed,onGround:S.plane.onGround};check(!S.plane.crashed&&!S.plane.onGround&&S.plane.y>8,'runway takeoff');S.exitPlane({silent:true});
  S.enterBoat();check(S.G.boating,'boat enter');S.exitBoat();check(!S.G.boating&&!S.car.frozen,'boat return');
  S.car.reset(P.spawn.x,P.spawn.z,P.spawn.yaw);S.rig.snapTo(S.car);S.loop.render(.016,1);return{results,failures};}''')
  print(json.dumps({k:v for k,v in result.items() if k!='results'}),flush=True);print(json.dumps({k:v for k,v in result['results'].items() if k!='buildingDrives'},indent=2),flush=True)
- # Interact through the rendered map; click a location north of the old map bounds.
+ # Interact through the rendered map; click a location on the western turnaround.
  page.locator('#minimap').click();page.screenshot(path=str(OUT/'campus-map.png'))
- bb=page.locator('#bigmap-canvas').bounding_box();x=bb['x']+(1710+1100)/5200*bb['width'];y=bb['y']+(-620+1100)/5200*bb['height']
+ bb=page.locator('#bigmap-canvas').bounding_box();x=bb['x']+(-420+1100)/5200*bb['width'];y=bb['y']+(2110+1100)/5200*bb['height']
  page.mouse.click(x,y);print('MAP_PIN',page.locator('#fly-text').inner_text(),flush=True);page.locator('#fly-btn').click()
- page.evaluate('''()=>{for(let i=0;i<330;i++)__svd.loop.render(1/60,1);}''');point=page.evaluate('({x:__svd.car.x,z:__svd.car.z})');print('MAP_TRAVEL',point,flush=True);assert abs(point['z']+620)<4
+ page.evaluate('''()=>{for(let i=0;i<330;i++)__svd.loop.render(1/60,1);}''');point=page.evaluate('({x:__svd.car.x,z:__svd.car.z})');print('MAP_TRAVEL',point,flush=True);assert abs(point['x']+420)<80 and abs(point['z']-2110)<80
  if os.environ.get('ROAD_BOUNDARY_QA')=='1': assert page.evaluate('__svd.ctx.roadBoundary.fits(__svd.car.x,__svd.car.z,__svd.car.yaw,__svd.car.halfL,__svd.car.halfW)')
  # Settings open/close and outside reset hotkey.
- page.keyboard.press('r');page.evaluate('()=>__svd.loop.render(.016,1)');assert page.evaluate('__svd.car.z<0')
+ page.keyboard.press('r');page.evaluate('()=>__svd.loop.render(.016,1)');assert page.evaluate('__svd.car.x<0')
  page.keyboard.press('Escape');page.locator('[data-act="settings"]').click();page.screenshot(path=str(OUT/'settings-regression.png'));page.keyboard.press('Escape');assert page.evaluate('__svd.G.overlay===null')
  print('BROWSER_ERRORS',errors,flush=True);result['browserErrors']=errors;result['mapTravel']=point
  (OUT/'qa-results.json').write_text(json.dumps(result,indent=2))

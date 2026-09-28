@@ -1,6 +1,7 @@
 // Build-time only: true polygon unions/differences. The browser loads only the baked result.
 import clipping from 'polygon-clipping';
 import { campusPoint, campusPlanKey } from '../src/world/university-plan.js';
+import { AIRSTRIP_OFFSET_X } from '../src/world/airstrip-plan.js';
 const round=v=>Math.round(v*1000)/1000;
 const polygon=pts=>[pts.map(([x,z])=>[round(x),round(z)])];
 export function join(polys){let q=polys.filter(p=>p?.length);while(q.length>1){const n=[];for(let i=0;i<q.length;i+=2)n.push(q[i+1]?clipping.union(q[i],q[i+1]):q[i]);q=n;}return q[0]||[];}
@@ -16,11 +17,14 @@ export function surfaceArea(multi){return multi.reduce((sum,poly)=>sum+poly.redu
 export function compileSurfaces(plan){
   const a=join(plan.roads.filter(r=>!r.drive).map(r=>bufferRoad(r)));
   const paversRaw=join([...plan.roads.filter(r=>r.drive).map(r=>bufferRoad(r)),...plan.precincts.map(p=>courtPolygon(p,0))]);
-  const paving=clipping.difference(paversRaw,a),road=join([a,paving]);
+  // Union the source shapes; re-unioning a difference creates coincident edges
+  // at the roundabout junctions and amplifies clipping round-off.
+  const paving=clipping.difference(paversRaw,a),road=join([a,paversRaw]);
   const outside=join([...plan.roads.map(r=>bufferRoad(r,3.2)),...plan.precincts.map(p=>courtPolygon(p,3.2))]);
   const thin=join([...plan.roads.map(r=>bufferRoad(r,.22)),...plan.precincts.map(p=>courtPolygon(p,.22))]);
   // Match the existing village and airstrip approach with open, flush end faces.
-  const seams=[polygon([[1493,2999],[1507,2999],[1507,3000.3],[1493,3000.3]]),polygon([[1493,3089.7],[1507,3089.7],[1507,3094],[1493,3094]])];
+  const ax=1500+AIRSTRIP_OFFSET_X;
+  const seams=[polygon([[1475,2996],[1525,2996],[1525,3000.3],[1475,3000.3]]),polygon([[ax-6,3089.7],[ax+6,3089.7],[ax+6,3094],[ax-6,3094]])];
   const curb=clipping.difference(thin,road,...seams);
   const sidewalk=clipping.difference(outside,thin,...seams);
   const result={key:campusPlanKey(plan),asphalt:a,paving,curb,sidewalk};

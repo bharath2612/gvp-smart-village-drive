@@ -312,7 +312,7 @@ async function boot() {
     G.phase = 'swoop'; G.swoopT = 0; G.swoopFrom = camera.position.clone(); G.swoopLook = new THREE.Vector3(1500, 0, 1500);
     input.enabled = false;
   }
-  function finishSwoop() { G.phase = 'drive'; input.enabled = true; rig.snapTo(veh()); ui.showControls(G.flying ? 9 : CONFIG.ui.controlsCardSeconds); ui.toast(G.flying ? 'Charter plane on runway 09. Hold W or Shift for full power, pull back with ↓ at 100 km/h. Press M to set a waypoint.' : 'Welcome to GVP University. Follow the campus loop, or head north to the village and airstrip. M opens the campus map.', 7); }
+  function finishSwoop() { G.phase = 'drive'; input.enabled = true; rig.snapTo(veh()); ui.showControls(G.flying ? 9 : CONFIG.ui.controlsCardSeconds); ui.toast(G.flying ? 'Charter plane on runway 09. Hold W or Shift for full power, pull back with ↓ at 100 km/h. Press M to set a waypoint.' : 'Welcome to GVP University. Drive straight to the village, or explore either campus road and return at its roundabout. M opens the campus map.', 7); }
 
   // ---------------------------------------------------------------- sim
   function sim(dt) {

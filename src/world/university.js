@@ -5,7 +5,7 @@ import { textBoard } from './campus.js';
 import { canPlant,forestSites } from './university-forest.js';
 import { addUniversityTrees } from './university-tree-models.js';
 import { rng } from '../util/math.js';
-import { createCampusPlan,campusPoint,localRect,boundsOf,inBox,projectPath,pathSamples,insideCampus,inAirfield,nearestCampusRoad,registerCampus } from './university-plan.js';
+import { createCampusPlan,campusPoint,localRect,boundsOf,inBox,projectPath,pathSamples,medianSegments,insideCampus,inAirfield,nearestCampusRoad,registerCampus } from './university-plan.js';
 import { buildingGeometry,STONE,TRIM,DARK } from './university-buildings.js';
 import { buildCampusSurfaces,polygonsGeometry } from './university-surfaces.js';
 
@@ -29,7 +29,7 @@ export function buildUniversity(ctx){
   const footprintBlocked=(x,z,m=0)=>plan.precincts.some(p=>p.boxes.some(b=>inBox(b,x,z,m)));
   const treeSafe=(x,z)=>canPlant(plan,x,z);
   for(const road of plan.roads){
-    if(!road.drive)for(const p of pathSamples(road,14)){
+    if(!road.drive&&!road.median)for(const p of pathSamples(road,14)){
       if(nearOther(road,p.x,p.z,14)||road.roundabout)continue;
       const g=patchGeo(-2.7,-.1,5.4,.2,4,.075);g.rotateY(-Math.atan2(p.dz,p.dx));g.translate(p.x,0,p.z);marks.push(g);
     }
@@ -43,12 +43,35 @@ export function buildUniversity(ctx){
       if(treeSafe(x,z))trees.push({x,z});
     }
   }
+  // Match the project's 30 m divided spine: two 11 m carriageways and an 8 m
+  // planted median. Leave a gap where the post-gate access road joins it.
+  const medianTiles=[],medianKerbs=[],medianTrees=[];
+  for(const road of plan.roads.filter(r=>r.median)){
+    const w=road.medianWidth;
+    for(const {x,z0,z1}of medianSegments(road)){
+      if(z1-z0<4)continue;
+      medianTiles.push(patchGeo(x-w/2,z0,w,z1-z0,4,.2));
+      for(const side of [-1,1])medianKerbs.push(box(.24,.2,z1-z0,0xb9b7b0,{x:x+side*(w/2-.12),z:(z0+z1)/2}));
+      for(const z of [z0,z1])medianKerbs.push(box(w,.2,.24,0xb9b7b0,{x,z}));
+      colliders.add(x-w/2,z0,x+w/2,z1,'median');
+      for(let z=z0+18;z<z1-12;z+=30)medianTrees.push({x,z});
+    }
+  }
+  mesh(merge(medianTiles),stdMat(T,T.lawn),'university-medians');
+  mesh(merge(medianKerbs),new THREE.MeshStandardMaterial({color:0xb9b7b0,roughness:.9}),'university-median-kerbs');
+  trees.push(...medianTrees);
   // Matching edge lines and directional arrows make both avenues visibly two-way.
   for(const road of plan.roads.filter(r=>r.width>=25)){
+    const edgeOffset=road.median?road.width/2-3.5:road.width/2-1;
     for(const p of pathSamples(road,4))for(const side of [-1,1]){
-      const x=p.x+p.nx*(road.width/2-1)*side,z=p.z+p.nz*(road.width/2-1)*side;
+      const x=p.x+p.nx*edgeOffset*side,z=p.z+p.nz*edgeOffset*side;
       if(nearOther(road,x,z,4))continue;
       const g=patchGeo(-2,-.09,4.05,.18,4,.08);g.rotateY(-Math.atan2(p.dz,p.dx));g.translate(x,0,z);marks.push(g);
+    }
+    if(road.median)for(const p of pathSamples(road,14))for(const side of [-1,1]){
+      if(road.medianBreaks.some(([a,b])=>p.z>=a-12&&p.z<=b+12)||p.z>=road.medianGateGap[0]-12&&p.z<=road.medianGateGap[1]+12)continue;
+      const x=p.x+p.nx*8*side,z=p.z+p.nz*8*side;
+      const dash=patchGeo(-2.2,-.09,4.4,.18,4,.08);dash.rotateY(-Math.atan2(p.dz,p.dx));dash.translate(x,0,z);marks.push(dash);
     }
     for(const p of pathSamples(road,road.roundabout?94:140))for(const side of road.roundabout?[0]:[-1,1]){
       if(!road.roundabout&&(p.at<35||nearOther(road,p.x,p.z,25)))continue;

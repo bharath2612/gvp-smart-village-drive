@@ -6,7 +6,7 @@ import { instancedChunks } from './instancing.js';
 export function buildWall(ctx) {
   const { scene, T, colliders } = ctx;
   const S = CONFIG.world.size, H = CONFIG.world.wallHeight, TH = CONFIG.world.wallThickness;
-  const gx = CONFIG.world.gate.x, gateW = 50;
+  const gx = CONFIG.world.gate.x, gateW = 30;
   const parts = [];
   // North, west, east walls full length; south wall in two pieces around the gate.
   parts.push(box(S + TH * 2, H, TH, 0xd8d3c8, { x: S / 2, z: -TH / 2 }));

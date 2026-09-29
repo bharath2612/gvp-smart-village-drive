@@ -168,6 +168,10 @@ export function roadPlacement(world, x, y, prefer) {
   if (r.points) {
     const p = projectPath(r, x, y);
     const yaw = prefer !== undefined && Math.cos(prefer - p.yaw) < 0 ? p.yaw + Math.PI : p.yaw;
+    if (r.median) {
+      const side = Math.cos(yaw-p.yaw) < 0 ? 1 : -1;
+      return { x:p.x+p.nx*side*7.5, y:p.z+p.nz*side*7.5, yaw, road:r };
+    }
     return { x: p.x, y: p.z, yaw, road: r };
   }
   let px, py, yaw;

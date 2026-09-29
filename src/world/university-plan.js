@@ -41,6 +41,17 @@ export function pathSamples(path,spacing) {
   }
   return out;
 }
+export function medianSegments(road){
+  if(!road.median)return [];
+  const x=road.points[0].x;
+  if(road.points.some(p=>Math.abs(p.x-x)>.001))throw new Error(`${road.id}: divided road must be straight`);
+  const lo=Math.min(road.points[0].z,road.points.at(-1).z),hi=Math.max(road.points[0].z,road.points.at(-1).z);
+  const gaps=[...(road.medianBreaks||[]),road.medianGateGap].filter(Boolean).map(([a,b])=>[Math.max(lo,a),Math.min(hi,b)]).sort((a,b)=>a[0]-b[0]);
+  const out=[];let at=lo;
+  for(const [a,b]of gaps){if(a>at)out.push({x,z0:at,z1:a,width:road.medianWidth});at=Math.max(at,b);}
+  if(at<hi)out.push({x,z0:at,z1:hi,width:road.medianWidth});
+  return out;
+}
 // Smooth through uneven control stations rather than offsetting a square.
 function windingLoop(anchors,closed=true) {
   const points=[];const n=anchors.length;
@@ -61,14 +72,14 @@ export function createCampusPlan() {
   // The estate boundary is independent of the drivable roads.
   const boundary=windingLoop([[-270,0],[-510,450],[-350,950],[-620,1570],[-500,2190],[-300,2830],[-170,3370],[470,3480],[1130,3430],[1700,3480],[2260,3390],[2940,3580],[3530,3380],[3480,2710],[3300,2110],[3570,1500],[3370,780],[3440,140],[3050,-400],[2340,-280],[1710,-620],[950,-430],[360,-560]]);
   const perimeter={points:boundary.map(([x,z])=>({x,z}))};
-  road('university-entrance',[[1500,3470],[1500,3000]],50,{flatEnds:true,name:'Main Approach'});
+  road('university-entrance',[[1500,3470],[1500,3000]],30,{flatEnds:true,median:true,medianWidth:8,medianBreaks:[[3048,3072]],medianGateGap:[3425,3455],name:'Main Approach'});
   const west=road('west-campus',windingLoop([[1500,3380],[1120,3430],[470,3480],[-170,3370],[-300,2830],[-450,2370],[-420,2170]],false),25,{name:'West Campus Road'});
   const east=road('east-campus',windingLoop([[1500,3380],[1850,3450],[2260,3390],[2940,3580],[3530,3380],[3480,2710],[3380,2350],[3390,2170]],false),25,{name:'East Campus Road'});
   const avenues=[west,east];
   const roundabouts=[{id:'west-turnaround',x:-420,z:2110},{id:'east-turnaround',x:3390,z:2110}];
   for(const q of roundabouts){q.radius=60;q.width=25;road(q.id,Array.from({length:65},(_,i)=>[q.x+q.radius*Math.sin(i*Math.PI/32),q.z+q.radius*Math.cos(i*Math.PI/32)]),q.width,{loop:true,roundabout:true,name:'Campus Turnaround'});}
   road('airstrip-access',[[1500,3060],[1500+AIRSTRIP_OFFSET_X,3060],[1500+AIRSTRIP_OFFSET_X,3090]],12,{flatEnds:true});
-  const plan={bounds:CAMPUS_BOUNDS,roads,precincts,boundary,perimeter,avenues,roundabouts,gate:{x:1500,z:3440,width:50},sports:{x:3090,z:2450,w:100,h:160},airfield:{x0:700+AIRSTRIP_OFFSET_X,x1:1580+AIRSTRIP_OFFSET_X,z0:3075,z1:3285},arrival:{x0:1468,x1:1565,z0:3420,z1:3455},approach:{x0:-1100,x1:4100,z0:3100,z1:3260}};
+  const plan={bounds:CAMPUS_BOUNDS,roads,precincts,boundary,perimeter,avenues,roundabouts,gate:{x:1500,z:3440,width:30},sports:{x:3090,z:2450,w:100,h:160},airfield:{x0:700+AIRSTRIP_OFFSET_X,x1:1580+AIRSTRIP_OFFSET_X,z0:3075,z1:3285},arrival:{x0:1478,x1:1522,z0:3420,z1:3455},approach:{x0:-1100,x1:4100,z0:3100,z1:3260}};
   const projectAvenue=(x,z)=>avenues.map(r=>projectPath(r,x,z)).sort((a,b)=>a.dist-b.dist)[0];
   const sportsEntry=projectAvenue(plan.sports.x+plan.sports.w+20,plan.sports.z+80);road('sports-drive',[[sportsEntry.x,sportsEntry.z],[plan.sports.x+plan.sports.w+20,plan.sports.z+80]],10);
   const inVillage=(r,m=20)=>r.x1>-m&&r.x0<3000+m&&r.z1>-m&&r.z0<3000+m;

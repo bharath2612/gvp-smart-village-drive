@@ -1,5 +1,5 @@
 // North-up minimap drawn from layout.json on a canvas; full-screen map with plot labels.
-import { campusPoint } from '../world/university-plan.js';
+import { campusPoint, medianSegments } from '../world/university-plan.js';
 import { AIRSTRIP_OFFSET_X } from '../world/airstrip-plan.js';
 
 export class Minimap {
@@ -60,7 +60,7 @@ export class Minimap {
     const p = this.world.campus;
     g.lineCap = 'round'; g.lineJoin = 'round';
     for(let i=0;i<(p.treeSites?.length||0);i+=3){const q=p.treeSites[i];g.fillStyle=['#395b3c','#45653e','#2a4533'][i%7%3];g.beginPath();g.arc(q.x*k,q.z*k,5*k,0,Math.PI*2);g.fill();}
-    for (const r of p.roads) { g.strokeStyle = '#b9b6a8'; g.lineWidth = Math.max(2, r.width * k); g.beginPath(); r.points.forEach((q, i) => i ? g.lineTo(q.x * k, q.z * k) : g.moveTo(q.x * k, q.z * k)); g.stroke(); }
+    for (const r of p.roads) { g.strokeStyle = '#b9b6a8'; g.lineWidth = Math.max(2, r.width * k); g.beginPath(); r.points.forEach((q, i) => i ? g.lineTo(q.x * k, q.z * k) : g.moveTo(q.x * k, q.z * k)); g.stroke(); if(r.median){g.strokeStyle='#68845a';g.lineWidth=r.medianWidth*k;for(const s of medianSegments(r)){g.beginPath();g.moveTo(s.x*k,s.z0*k);g.lineTo(s.x*k,s.z1*k);g.stroke();for(let z=s.z0+18;z<s.z1-12;z+=30){g.fillStyle='#466840';g.beginPath();g.arc(s.x*k,z*k,4*k,0,Math.PI*2);g.fill();}}} }
     // Runway, apron and airstrip connector are preserved on the enlarged map.
     g.save();g.translate(AIRSTRIP_OFFSET_X*k,0);
     g.fillStyle = '#798894'; g.fillRect(800*k,3168.5*k,600*k,23*k); g.fillRect(1398*k,3174*k,82*k,12*k); g.fillRect(1450*k,3160*k,60*k,40*k); g.fillRect(1494*k,3090*k,12*k,70*k);

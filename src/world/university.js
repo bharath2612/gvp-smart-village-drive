@@ -8,6 +8,7 @@ import { rng } from '../util/math.js';
 import { createCampusPlan,campusPoint,localRect,boundsOf,inBox,projectPath,pathSamples,medianSegments,insideCampus,inAirfield,nearestCampusRoad,registerCampus } from './university-plan.js';
 import { buildingGeometry,STONE,TRIM,DARK } from './university-buildings.js';
 import { buildCampusSurfaces,polygonsGeometry } from './university-surfaces.js';
+import { buildCampusWall } from './university-wall.js';
 
 // Landscape and architecture are generated once, with seeded placement and spatially culled instances.
 export function buildUniversity(ctx){
@@ -24,6 +25,7 @@ export function buildUniversity(ctx){
   };
   mesh(polygonsGeometry([[plan.boundary,[[0,0],[3000,0],[3000,3000],[0,3000]]]],0),landMat,'university-land');
   buildCampusSurfaces(ctx,plan,root);
+  buildCampusWall(ctx,plan,root,mats);
   const lamps=[],trees=[],benches=[],lights=[],marks=[],bushes=[],basins=[];
   const nearOther=(road,x,z,margin)=>plan.roads.some(o=>o!==road&&projectPath(o,x,z).dist<o.width/2+margin);
   const footprintBlocked=(x,z,m=0)=>plan.precincts.some(p=>p.boxes.some(b=>inBox(b,x,z,m)));
@@ -60,6 +62,17 @@ export function buildUniversity(ctx){
   mesh(merge(medianTiles),stdMat(T,T.lawn),'university-medians');
   mesh(merge(medianKerbs),new THREE.MeshStandardMaterial({color:0xb9b7b0,roughness:.9}),'university-median-kerbs');
   trees.push(...medianTrees);
+  // The outer ORR-style highway has a broad planted central reservation. It
+  // is cut out of the baked asphalt above and rendered here with low kerbs so
+  // the approach visibly reads as a divided national highway.
+  const highwayMedians=[],highwayKerbs=[];
+  for(const road of plan.roads.filter(r=>r.highway&&!r.highwayRamp)){
+    const a=road.points[0],b=road.points.at(-1),x0=Math.min(a.x,b.x),x1=Math.max(a.x,b.x),z=a.z;
+    highwayMedians.push(patchGeo(x0,z-5,x1-x0,10,4,.2));
+    highwayKerbs.push(box(x1-x0,.2,.24,0xb9b7b0,{x:(x0+x1)/2,z:z-4.88}),box(x1-x0,.2,.24,0xb9b7b0,{x:(x0+x1)/2,z:z+4.88}));
+  }
+  mesh(merge(highwayMedians),stdMat(T,T.lawn),'university-highway-median');
+  mesh(merge(highwayKerbs),new THREE.MeshStandardMaterial({color:0xb9b7b0,roughness:.9}),'university-highway-kerbs');
   // Matching edge lines and directional arrows make both avenues visibly two-way.
   const stripe=(p,x,z,length=4.05)=>{const g=patchGeo(-.09,-length/2,.18,length,4,.08);g.rotateY(Math.atan2(p.dx,p.dz));g.translate(x,0,z);return g;};
   const arrow=(p,x,z,reverse=false)=>{
@@ -71,7 +84,7 @@ export function buildUniversity(ctx){
     const edgeOffset=road.median?road.width/2-3.5:road.width/2-1;
     // The divided main road uses kerbs and the planted median as its visual
     // edges; outer edge stripes made the footpath boundary look like a stray line.
-    if(!road.median)for(const p of pathSamples(road,4))for(const side of [-1,1]){
+    if(!road.median&&!road.highway)for(const p of pathSamples(road,4))for(const side of [-1,1]){
       const x=p.x+p.nx*edgeOffset*side,z=p.z+p.nz*edgeOffset*side;
       if(nearOther(road,x,z,4))continue;
       marks.push(stripe(p,x,z));
@@ -80,6 +93,15 @@ export function buildUniversity(ctx){
       if(road.medianBreaks.some(([a,b])=>p.z>=a-12&&p.z<=b+12))continue;
       const x=p.x+p.nx*8*side,z=p.z+p.nz*8*side;
       marks.push(stripe(p,x,z,4.4));
+    }
+    if(road.highway){
+      // Four-lane highway lane separators and edge lines; no oversized turn
+      // arrows are placed on the high-speed carriageway.
+      for(const p of pathSamples(road,12)){
+        for(const off of [-15,15])marks.push(stripe(p,p.x+p.nx*off,p.z+p.nz*off,5.2));
+        for(const off of [-23,23])marks.push(stripe(p,p.x+p.nx*off,p.z+p.nz*off,5.2));
+      }
+      continue;
     }
     for(const p of pathSamples(road,road.roundabout?94:140))for(const side of road.roundabout?[0]:[-1,1]){
       if(!road.roundabout&&(p.at<35||nearOther(road,p.x,p.z,25)))continue;

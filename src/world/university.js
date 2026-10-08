@@ -64,12 +64,14 @@ export function buildUniversity(ctx){
   const stripe=(p,x,z,length=4.05)=>{const g=patchGeo(-.09,-length/2,.18,length,4,.08);g.rotateY(Math.atan2(p.dx,p.dz));g.translate(x,0,z);return g;};
   const arrow=(p,x,z,reverse=false)=>{
     const shape=new THREE.Shape();
-    shape.moveTo(-1.5,2.6);shape.lineTo(1.5,2.6);shape.lineTo(1.5,-.2);shape.lineTo(3,-.2);shape.lineTo(0,-3.2);shape.lineTo(-3,-.2);shape.lineTo(-1.5,-.2);shape.closePath();
+    shape.moveTo(-.45,1.05);shape.lineTo(.45,1.05);shape.lineTo(.45,-.15);shape.lineTo(1.05,-.15);shape.lineTo(0,-1.35);shape.lineTo(-1.05,-.15);shape.lineTo(-.45,-.15);shape.closePath();
     const g=new THREE.ShapeGeometry(shape);g.rotateX(-Math.PI/2);g.rotateY(Math.atan2(p.dx,p.dz)+(reverse?Math.PI:0));g.translate(x,.08,z);return g;
   };
   for(const road of plan.roads.filter(r=>r.width>=25)){
     const edgeOffset=road.median?road.width/2-3.5:road.width/2-1;
-    for(const p of pathSamples(road,4))for(const side of [-1,1]){
+    // The divided main road uses kerbs and the planted median as its visual
+    // edges; outer edge stripes made the footpath boundary look like a stray line.
+    if(!road.median)for(const p of pathSamples(road,4))for(const side of [-1,1]){
       const x=p.x+p.nx*edgeOffset*side,z=p.z+p.nz*edgeOffset*side;
       if(nearOther(road,x,z,4))continue;
       marks.push(stripe(p,x,z));

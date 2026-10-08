@@ -65,14 +65,24 @@ export function buildUniversity(ctx){
   // The outer ORR-style highway has a broad planted central reservation. It
   // is cut out of the baked asphalt above and rendered here with low kerbs so
   // the approach visibly reads as a divided national highway.
-  const highwayMedians=[],highwayKerbs=[];
-  for(const road of plan.roads.filter(r=>r.highway&&!r.highwayRamp)){
-    const a=road.points[0],b=road.points.at(-1),x0=Math.min(a.x,b.x),x1=Math.max(a.x,b.x),z=a.z;
-    highwayMedians.push(patchGeo(x0,z-5,x1-x0,10,4,.2));
-    highwayKerbs.push(box(x1-x0,.2,.24,0xb9b7b0,{x:(x0+x1)/2,z:z-4.88}),box(x1-x0,.2,.24,0xb9b7b0,{x:(x0+x1)/2,z:z+4.88}));
+  const highwayMedians=[],highwayKerbs=[],highwayBarriers=[],rampRails=[];
+  const highwayCarriageways=plan.roads.filter(r=>r.highway&&!r.highwayRamp);
+  if(highwayCarriageways.length>=2){
+    const a=highwayCarriageways[0].points[0],b=highwayCarriageways[0].points.at(-1),c=highwayCarriageways[1].points[0],d=highwayCarriageways[1].points.at(-1);
+    const x0=Math.min(a.x,b.x,c.x,d.x),x1=Math.max(a.x,b.x,c.x,d.x),z=(a.z+c.z)/2;
+    highwayMedians.push(patchGeo(x0,z-4,x1-x0,8,4,.2));
+    highwayKerbs.push(box(x1-x0,.2,.24,0xb9b7b0,{x:(x0+x1)/2,z:z-3.88}),box(x1-x0,.2,.24,0xb9b7b0,{x:(x0+x1)/2,z:z+3.88}));
+    for(let x=x0+8;x<x1-4;x+=12)highwayBarriers.push(box(2.4,1.05,.52,0x9b9b96,{x,y:.52,z}));
+  }
+  for(const ramp of plan.roads.filter(r=>r.highwayRamp))for(let i=1;i<ramp.points.length;i++){
+    const a=ramp.points[i-1],b=ramp.points[i],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<1)continue;
+    const nx=-dz/len,nz=dx/len;
+    for(const side of [-1,1])rampRails.push(box(len,.45,.2,0x9b9b96,{x:(a.x+b.x)/2+nx*(ramp.width/2+1.2)*side,y:.52,z:(a.z+b.z)/2+nz*(ramp.width/2+1.2)*side,rotY:-Math.atan2(dz,dx)}));
   }
   mesh(merge(highwayMedians),stdMat(T,T.lawn),'university-highway-median');
   mesh(merge(highwayKerbs),new THREE.MeshStandardMaterial({color:0xb9b7b0,roughness:.9}),'university-highway-kerbs');
+  mesh(merge(highwayBarriers),new THREE.MeshStandardMaterial({color:0x8e8f8b,roughness:.95}),'university-highway-barriers');
+  mesh(merge(rampRails),new THREE.MeshStandardMaterial({color:0x8e8f8b,roughness:.95}),'university-ramp-guardrails');
   // Matching edge lines and directional arrows make both avenues visibly two-way.
   const stripe=(p,x,z,length=4.05)=>{const g=patchGeo(-.09,-length/2,.18,length,4,.08);g.rotateY(Math.atan2(p.dx,p.dz));g.translate(x,0,z);return g;};
   const arrow=(p,x,z,reverse=false)=>{
@@ -95,11 +105,10 @@ export function buildUniversity(ctx){
       marks.push(stripe(p,x,z,4.4));
     }
     if(road.highway){
-      // Four-lane highway lane separators and edge lines; no oversized turn
-      // arrows are placed on the high-speed carriageway.
+      // Six lanes per direction: five dashed separators plus solid shoulder
+      // lines. No oversized turn arrows are placed on the expressway.
       for(const p of pathSamples(road,12)){
-        for(const off of [-15,15])marks.push(stripe(p,p.x+p.nx*off,p.z+p.nz*off,5.2));
-        for(const off of [-23,23])marks.push(stripe(p,p.x+p.nx*off,p.z+p.nz*off,5.2));
+        for(const off of [-15,-9,-3,3,9,15])marks.push(stripe(p,p.x+p.nx*off,p.z+p.nz*off,5.2));
       }
       continue;
     }

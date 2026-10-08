@@ -75,8 +75,13 @@ export function createCampusPlan() {
   // The campus starts immediately after a turn from the divided ORR-style
   // highway. The highway is outside the estate wall; the approach ramp joins
   // it to the existing gate road so the current spawn remains after the turn.
-  road('national-highway', [[-1100,3820],[4100,3820]], 50, {highway:true,name:'National Highway'});
-  road('university-approach-ramp', [[1500,3820],[1500,3470]], 30, {highwayRamp:true,flatEnds:true,name:'University Turn'});
+  // Six lanes per direction, separated carriageways and a narrow protected
+  // median, matching the scale of Hyderabad's controlled-access ORR.
+  road('national-highway-north', [[-1100,3795],[4100,3795]], 38, {highway:true,carriageway:'north',name:'National Highway'});
+  road('national-highway-south', [[-1100,3845],[4100,3845]], 38, {highway:true,carriageway:'south',name:'National Highway'});
+  // A sweeping two-lane exit ramp bends away from the carriageway before
+  // lining up with the university gate, instead of ending at a hard T-junction.
+  road('university-approach-ramp', [[1410,3795],[1368,3762],[1348,3712],[1360,3652],[1402,3592],[1460,3536],[1500,3470]], 18, {highwayRamp:true,name:'University Turn'});
   road('university-entrance',[[1500,3470],[1500,3000]],30,{flatEnds:true,median:true,medianWidth:8,medianBreaks:[[3048,3072]],name:'Main Approach'});
   const west=road('west-campus',windingLoop([[1500,3380],[1120,3430],[470,3480],[-170,3370],[-300,2830],[-450,2370],[-420,2170]],false),25,{name:'West Campus Road'});
   const east=road('east-campus',windingLoop([[1500,3380],[1850,3450],[2260,3390],[2940,3580],[3530,3380],[3480,2710],[3380,2350],[3390,2170]],false),25,{name:'East Campus Road'});

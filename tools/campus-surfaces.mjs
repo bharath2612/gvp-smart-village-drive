@@ -17,8 +17,9 @@ export function surfaceArea(multi){return multi.reduce((sum,poly)=>sum+poly.redu
 export function compileSurfaces(plan){
   const pavedSource=join(plan.roads.filter(r=>!r.drive).map(r=>bufferRoad(r)));
   const medians=join(plan.roads.filter(r=>r.median).flatMap(r=>medianSegments(r).map(s=>polygon([[s.x-s.width/2,s.z0],[s.x+s.width/2,s.z0],[s.x+s.width/2,s.z1],[s.x-s.width/2,s.z1]]))));
-  const highwayMedians=join(plan.roads.filter(r=>r.highway&&!r.highwayRamp).map(r=>polygon([[r.points[0].x,r.points[0].z-5],[r.points.at(-1).x,r.points.at(-1).z-5],[r.points.at(-1).x,r.points.at(-1).z+5],[r.points[0].x,r.points[0].z+5]])));
-  const medianCut=join([medians,highwayMedians]);
+  // The two highway carriageways are separate polygons; their eight-metre
+  // central reservation is the physical gap between them.
+  const medianCut=medians;
   const a=medianCut.length?clipping.difference(pavedSource,medianCut):pavedSource;
   const paversRaw=join([...plan.roads.filter(r=>r.drive).map(r=>bufferRoad(r)),...plan.precincts.map(p=>courtPolygon(p,0))]);
   // Union the source shapes; re-unioning a difference creates coincident edges

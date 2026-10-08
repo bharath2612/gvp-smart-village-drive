@@ -25,8 +25,12 @@ export function compileSurfaces(plan){
   // Union the source shapes; re-unioning a difference creates coincident edges
   // at the roundabout junctions and amplifies clipping round-off.
   const paving=clipping.difference(paversRaw,pavedSource),road=join([a,paversRaw]);
-  const outsideRaw=join([...plan.roads.map(r=>bufferRoad(r,3.2)),...plan.precincts.map(p=>courtPolygon(p,3.2))]);
-  const thinRaw=join([...plan.roads.map(r=>bufferRoad(r,.22)),...plan.precincts.map(p=>courtPolygon(p,.22))]);
+  // Controlled-access carriageways and the exit ramp use shoulders/guardrails,
+  // not campus footpaths. Keeping them out of these ribbons prevents sidewalk
+  // slabs from cutting diagonally across the interchange.
+  const sidewalkRoads=plan.roads.filter(r=>!r.highway&&!r.highwayRamp&&!r.noSidewalk);
+  const outsideRaw=join([...sidewalkRoads.map(r=>bufferRoad(r,3.2)),...plan.precincts.map(p=>courtPolygon(p,3.2))]);
+  const thinRaw=join([...sidewalkRoads.map(r=>bufferRoad(r,.22)),...plan.precincts.map(p=>courtPolygon(p,.22))]);
   const outside=medianCut.length?clipping.difference(outsideRaw,medianCut):outsideRaw;
   const thin=medianCut.length?clipping.difference(thinRaw,medianCut):thinRaw;
   // Match the existing village and airstrip approach with open, flush end faces.

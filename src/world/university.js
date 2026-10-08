@@ -31,7 +31,7 @@ export function buildUniversity(ctx){
   const footprintBlocked=(x,z,m=0)=>plan.precincts.some(p=>p.boxes.some(b=>inBox(b,x,z,m)));
   const treeSafe=(x,z)=>canPlant(plan,x,z);
   for(const road of plan.roads){
-    if(!road.drive&&!road.median)for(const p of pathSamples(road,14)){
+    if(!road.drive&&!road.median&&!road.highway)for(const p of pathSamples(road,14)){
       if(nearOther(road,p.x,p.z,14)||road.roundabout)continue;
       const g=patchGeo(-2.7,-.1,5.4,.2,4,.075);g.rotateY(-Math.atan2(p.dz,p.dx));g.translate(p.x,0,p.z);marks.push(g);
     }
@@ -70,14 +70,26 @@ export function buildUniversity(ctx){
   if(highwayCarriageways.length>=2){
     const a=highwayCarriageways[0].points[0],b=highwayCarriageways[0].points.at(-1),c=highwayCarriageways[1].points[0],d=highwayCarriageways[1].points.at(-1);
     const x0=Math.min(a.x,b.x,c.x,d.x),x1=Math.max(a.x,b.x,c.x,d.x),z=(a.z+c.z)/2;
-    highwayMedians.push(patchGeo(x0,z-4,x1-x0,8,4,.2));
-    highwayKerbs.push(box(x1-x0,.2,.24,0xb9b7b0,{x:(x0+x1)/2,z:z-3.88}),box(x1-x0,.2,.24,0xb9b7b0,{x:(x0+x1)/2,z:z+3.88}));
-    for(let x=x0+8;x<x1-4;x+=12)highwayBarriers.push(box(2.4,1.05,.52,0x9b9b96,{x,y:.52,z}));
+    // The exit joins the outer edge; the highway median stays continuous.
+    for(const [s,e] of [[x0,x1]])if(e>s){
+      highwayMedians.push(patchGeo(s,z-4,e-s,8,4,.2));
+      highwayKerbs.push(box(e-s,.2,.24,0xb9b7b0,{x:(s+e)/2,z:z-3.88}),box(e-s,.2,.24,0xb9b7b0,{x:(s+e)/2,z:z+3.88}));
+      for(let x=s+8;x<e-4;x+=12)highwayBarriers.push(box(2.4,1.05,.52,0x9b9b96,{x,y:.52,z}));
+    }
   }
-  for(const ramp of plan.roads.filter(r=>r.highwayRamp))for(let i=1;i<ramp.points.length;i++){
-    const a=ramp.points[i-1],b=ramp.points[i],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<1)continue;
-    const nx=-dz/len,nz=dx/len;
-    for(const side of [-1,1])rampRails.push(box(len,.45,.2,0x9b9b96,{x:(a.x+b.x)/2+nx*(ramp.width/2+1.2)*side,y:.52,z:(a.z+b.z)/2+nz*(ramp.width/2+1.2)*side,rotY:-Math.atan2(dz,dx)}));
+  for(const ramp of plan.roads.filter(r=>r.highwayRamp)){
+    const samples=pathSamples(ramp,2);
+    for(const side of [-1,1])for(let i=1;i<samples.length;i++){
+      const a=samples[i-1],b=samples[i],off=ramp.width/2+1;
+      const ax=a.x+a.nx*off*side,az=a.z+a.nz*off*side;
+      const bx=b.x+b.nx*off*side,bz=b.z+b.nz*off*side;
+      // Trim rail ends to the union of adjoining roads, including a vehicle
+      // clearance margin. Never run the ramp's rail across another road.
+      if(nearOther(ramp,ax,az,4)||nearOther(ramp,bx,bz,4)||a.at<20)continue;
+      const len=Math.hypot(bx-ax,bz-az);
+      rampRails.push(box(len+.04,.32,.16,0x9b9b96,{x:(ax+bx)/2,y:.85,z:(az+bz)/2,rotY:-Math.atan2(bz-az,bx-ax)}));
+      if(i%3===0)rampRails.push(box(.14,.85,.14,0x777b7e,{x:ax,z:az}));
+    }
   }
   mesh(merge(highwayMedians),stdMat(T,T.lawn),'university-highway-median');
   mesh(merge(highwayKerbs),new THREE.MeshStandardMaterial({color:0xb9b7b0,roughness:.9}),'university-highway-kerbs');
@@ -94,7 +106,7 @@ export function buildUniversity(ctx){
     const edgeOffset=road.median?road.width/2-3.5:road.width/2-1;
     // The divided main road uses kerbs and the planted median as its visual
     // edges; outer edge stripes made the footpath boundary look like a stray line.
-    if(!road.median&&!road.highway)for(const p of pathSamples(road,4))for(const side of [-1,1]){
+    if(!road.median&&!road.highway&&!road.highwayRamp)for(const p of pathSamples(road,4))for(const side of [-1,1]){
       const x=p.x+p.nx*edgeOffset*side,z=p.z+p.nz*edgeOffset*side;
       if(nearOther(road,x,z,4))continue;
       marks.push(stripe(p,x,z));
@@ -104,11 +116,22 @@ export function buildUniversity(ctx){
       const x=p.x+p.nx*8*side,z=p.z+p.nz*8*side;
       marks.push(stripe(p,x,z,4.4));
     }
+    if(road.highwayRamp){
+      for(const p of pathSamples(road,3))for(const side of [-1,1]){
+        const x=p.x+p.nx*13.5*side,z=p.z+p.nz*13.5*side;
+        if(!nearOther(road,x,z,2))marks.push(stripe(p,x,z,3.1));
+      }
+      continue;
+    }
     if(road.highway){
       // Six lanes per direction: five dashed separators plus solid shoulder
       // lines. No oversized turn arrows are placed on the expressway.
       for(const p of pathSamples(road,12)){
-        for(const off of [-15,-9,-3,3,9,15])marks.push(stripe(p,p.x+p.nx*off,p.z+p.nz*off,5.2));
+        for(const off of [-12,-6,0,6,12])marks.push(stripe(p,p.x+p.nx*off,p.z+p.nz*off,5.2));
+      }
+      for(const p of pathSamples(road,3))for(const off of [-18,18]){
+        const x=p.x+p.nx*off,z=p.z+p.nz*off;
+        if(!nearOther(road,x,z,1))marks.push(stripe(p,x,z,3.1));
       }
       continue;
     }

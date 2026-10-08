@@ -81,7 +81,15 @@ export function createCampusPlan() {
   road('national-highway-south', [[-1100,3845],[4100,3845]], 38, {highway:true,carriageway:'south',name:'National Highway'});
   // A sweeping two-lane exit ramp bends away from the carriageway before
   // lining up with the university gate, instead of ending at a hard T-junction.
-  road('university-approach-ramp', [[1410,3795],[1368,3762],[1348,3712],[1360,3652],[1402,3592],[1460,3536],[1500,3470]], 18, {highwayRamp:true,name:'University Turn'});
+  const rampPoints=Array.from({length:81},(_,i)=>{
+    const t=i/80,u=1-t;
+    // Tangent to the westbound highway at entry and the northbound gate road
+    // at arrival. Dense curve stations also define markings and guardrails.
+    return [u*u*u*1900+3*u*u*t*1500+3*u*t*t*1500+t*t*t*1500,
+      u*u*u*3791+3*u*u*t*3791+3*u*t*t*3670+t*t*t*3495];
+  });
+  rampPoints.push([1500,3470]);
+  road('university-approach-ramp', rampPoints, 30, {highwayRamp:true,flatEnds:true,name:'University Turn'});
   road('university-entrance',[[1500,3470],[1500,3000]],30,{flatEnds:true,median:true,medianWidth:8,medianBreaks:[[3048,3072]],name:'Main Approach'});
   const west=road('west-campus',windingLoop([[1500,3380],[1120,3430],[470,3480],[-170,3370],[-300,2830],[-450,2370],[-420,2170]],false),25,{name:'West Campus Road'});
   const east=road('east-campus',windingLoop([[1500,3380],[1850,3450],[2260,3390],[2940,3580],[3530,3380],[3480,2710],[3380,2350],[3390,2170]],false),25,{name:'East Campus Road'});

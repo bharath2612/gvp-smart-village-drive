@@ -61,23 +61,28 @@ export function buildUniversity(ctx){
   mesh(merge(medianKerbs),new THREE.MeshStandardMaterial({color:0xb9b7b0,roughness:.9}),'university-median-kerbs');
   trees.push(...medianTrees);
   // Matching edge lines and directional arrows make both avenues visibly two-way.
+  const stripe=(p,x,z,length=4.05)=>{const g=patchGeo(-.09,-length/2,.18,length,4,.08);g.rotateY(Math.atan2(p.dx,p.dz));g.translate(x,0,z);return g;};
+  const arrow=(p,x,z,reverse=false)=>{
+    const shape=new THREE.Shape();
+    shape.moveTo(-1.5,2.6);shape.lineTo(1.5,2.6);shape.lineTo(1.5,-.2);shape.lineTo(3,-.2);shape.lineTo(0,-3.2);shape.lineTo(-3,-.2);shape.lineTo(-1.5,-.2);shape.closePath();
+    const g=new THREE.ShapeGeometry(shape);g.rotateX(-Math.PI/2);g.rotateY(Math.atan2(p.dx,p.dz)+(reverse?Math.PI:0));g.translate(x,.08,z);return g;
+  };
   for(const road of plan.roads.filter(r=>r.width>=25)){
     const edgeOffset=road.median?road.width/2-3.5:road.width/2-1;
     for(const p of pathSamples(road,4))for(const side of [-1,1]){
       const x=p.x+p.nx*edgeOffset*side,z=p.z+p.nz*edgeOffset*side;
       if(nearOther(road,x,z,4))continue;
-      const g=patchGeo(-2,-.09,4.05,.18,4,.08);g.rotateY(-Math.atan2(p.dz,p.dx));g.translate(x,0,z);marks.push(g);
+      marks.push(stripe(p,x,z));
     }
     if(road.median)for(const p of pathSamples(road,14))for(const side of [-1,1]){
-      if(road.medianBreaks.some(([a,b])=>p.z>=a-12&&p.z<=b+12)||p.z>=road.medianGateGap[0]-12&&p.z<=road.medianGateGap[1]+12)continue;
+      if(road.medianBreaks.some(([a,b])=>p.z>=a-12&&p.z<=b+12))continue;
       const x=p.x+p.nx*8*side,z=p.z+p.nz*8*side;
-      const dash=patchGeo(-2.2,-.09,4.4,.18,4,.08);dash.rotateY(-Math.atan2(p.dz,p.dx));dash.translate(x,0,z);marks.push(dash);
+      marks.push(stripe(p,x,z,4.4));
     }
     for(const p of pathSamples(road,road.roundabout?94:140))for(const side of road.roundabout?[0]:[-1,1]){
       if(!road.roundabout&&(p.at<35||nearOther(road,p.x,p.z,25)))continue;
-      const x=p.x+p.nx*road.width*.23*side,z=p.z+p.nz*road.width*.23*side;
-      const arrow=merge([patchGeo(-2.5,-.18,4,.36,4,.08),patchGeo(-1.2,-.16,2.4,.32,4,.08).rotateY(Math.PI/4).translate(1.4,0,-.7),patchGeo(-1.2,-.16,2.4,.32,4,.08).rotateY(-Math.PI/4).translate(1.4,0,.7)]);
-      arrow.rotateY(-Math.atan2(p.dz,p.dx)+(road.roundabout||side>0?Math.PI:0));arrow.translate(x,0,z);marks.push(arrow);
+      const x=p.x+p.nx*(road.median?road.width/2-5:road.width*.23)*side,z=p.z+p.nz*(road.median?road.width/2-5:road.width*.23)*side;
+      marks.push(arrow(p,x,z,road.roundabout||side>0));
     }
   }
   mesh(merge(marks),new THREE.MeshStandardMaterial({color:0xe9e4d5,roughness:1}),'university-markings');

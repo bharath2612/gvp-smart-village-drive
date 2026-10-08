@@ -72,7 +72,7 @@ export function createCampusPlan() {
   // The estate boundary is independent of the drivable roads.
   const boundary=windingLoop([[-270,0],[-510,450],[-350,950],[-620,1570],[-500,2190],[-300,2830],[-170,3370],[470,3480],[1130,3430],[1700,3480],[2260,3390],[2940,3580],[3530,3380],[3480,2710],[3300,2110],[3570,1500],[3370,780],[3440,140],[3050,-400],[2340,-280],[1710,-620],[950,-430],[360,-560]]);
   const perimeter={points:boundary.map(([x,z])=>({x,z}))};
-  road('university-entrance',[[1500,3470],[1500,3000]],30,{flatEnds:true,median:true,medianWidth:8,medianBreaks:[[3048,3072]],medianGateGap:[3425,3455],name:'Main Approach'});
+  road('university-entrance',[[1500,3470],[1500,3000]],30,{flatEnds:true,median:true,medianWidth:8,medianBreaks:[[3048,3072]],name:'Main Approach'});
   const west=road('west-campus',windingLoop([[1500,3380],[1120,3430],[470,3480],[-170,3370],[-300,2830],[-450,2370],[-420,2170]],false),25,{name:'West Campus Road'});
   const east=road('east-campus',windingLoop([[1500,3380],[1850,3450],[2260,3390],[2940,3580],[3530,3380],[3480,2710],[3380,2350],[3390,2170]],false),25,{name:'East Campus Road'});
   const avenues=[west,east];

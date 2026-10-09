@@ -32,7 +32,7 @@ export function buildUniversity(ctx){
   const treeSafe=(x,z)=>canPlant(plan,x,z);
   for(const road of plan.roads){
     if(!road.drive&&!road.median&&!road.highway)for(const p of pathSamples(road,14)){
-      if(nearOther(road,p.x,p.z,14)||road.roundabout)continue;
+      if(nearOther(road,p.x,p.z,14)||road.roundabout||(road.highwayRamp&&p.z<=3527))continue;
       const g=patchGeo(-2.7,-.1,5.4,.2,4,.075);g.rotateY(-Math.atan2(p.dz,p.dx));g.translate(p.x,0,p.z);marks.push(g);
     }
     for(const p of pathSamples(road,road.drive?35:46))for(const side of [-1,1]){
@@ -97,6 +97,24 @@ export function buildUniversity(ctx){
   mesh(merge(rampRails),new THREE.MeshStandardMaterial({color:0x8e8f8b,roughness:.95}),'university-ramp-guardrails');
   // Matching edge lines and directional arrows make both avenues visibly two-way.
   const stripe=(p,x,z,length=4.05)=>{const g=patchGeo(-.09,-length/2,.18,length,4,.08);g.rotateY(Math.atan2(p.dx,p.dz));g.translate(x,0,z);return g;};
+  // Painted approach nose: a 55 m taper widens from a point to the
+  // planted median, giving drivers a gradual guide into the two carriageways.
+  const entranceRoad=plan.roads.find(r=>r.id==='university-entrance');
+  const noseX=entranceRoad.points[0].x,noseZ=entranceRoad.points[0].z;
+  const taperLength=55,halfMedian=entranceRoad.medianWidth/2;
+  const paintLine=(ax,az,bx,bz)=>{
+    const dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz);
+    return stripe({dx:dx/len,dz:dz/len},(ax+bx)/2,(az+bz)/2,len);
+  };
+  const nosePaint=[];
+  for(const side of [-1,1])nosePaint.push(paintLine(noseX,noseZ+taperLength,noseX+side*(halfMedian-.09),noseZ));
+  // Chevron tips face approaching traffic. Each arm ends inside the outline.
+  for(let distance=10;distance<taperLength-2;distance+=5){
+    const z=noseZ+taperLength-distance;
+    const half=(halfMedian-.09)*distance/taperLength-.25;
+    for(const side of [-1,1])nosePaint.push(paintLine(noseX,z+2,noseX+side*half,z));
+  }
+  mesh(merge(nosePaint),new THREE.MeshStandardMaterial({color:0xe9e4d5,roughness:1}),'university-median-approach-hatching');
   const arrow=(p,x,z,reverse=false)=>{
     const shape=new THREE.Shape();
     shape.moveTo(-.45,1.05);shape.lineTo(.45,1.05);shape.lineTo(.45,-.15);shape.lineTo(1.05,-.15);shape.lineTo(0,-1.35);shape.lineTo(-1.05,-.15);shape.lineTo(-.45,-.15);shape.closePath();

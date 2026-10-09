@@ -13,7 +13,8 @@
     "prebuild": "npm run bake-campus",
     "test:campus": "node tools/test-campus.mjs",
     "test:campus-routes": "node tools/test-campus-routes.mjs",
-    "test:road-boundary": "node tools/test-road-boundary.mjs"
+    "test:road-boundary": "node tools/test-road-boundary.mjs",
+    "test:campus-wall": "node tools/test-campus-wall.mjs"
   },
   "dependencies": {
     "three": "^0.180.0",

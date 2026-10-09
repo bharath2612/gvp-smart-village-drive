@@ -23,9 +23,9 @@ export function buildUniversity(ctx){
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec2 vEstate;').replace('#include <begin_vertex>','#include <begin_vertex>\nvEstate=position.xz;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec2 vEstate;').replace('#include <color_fragment>','#include <color_fragment>\nfloat forestTone=sin(vEstate.x*.023+sin(vEstate.y*.013))*sin(vEstate.y*.031)+.4*sin((vEstate.x+vEstate.y)*.071);diffuseColor.rgb*=.94+forestTone*.08;');
   };
-  mesh(polygonsGeometry([[plan.boundary,[[0,0],[3000,0],[3000,3000],[0,3000]]]],0),landMat,'university-land');
-  buildCampusSurfaces(ctx,plan,root);
   buildCampusWall(ctx,plan,root,mats);
+  mesh(polygonsGeometry([[plan.wallBoundary,[[0,0],[3000,0],[3000,3000],[0,3000]]]],0),landMat,'university-land');
+  buildCampusSurfaces(ctx,plan,root);
   const lamps=[],trees=[],benches=[],lights=[],marks=[],bushes=[],basins=[];
   const nearOther=(road,x,z,margin)=>plan.roads.some(o=>o!==road&&projectPath(o,x,z).dist<o.width/2+margin);
   const footprintBlocked=(x,z,m=0)=>plan.precincts.some(p=>p.boxes.some(b=>inBox(b,x,z,m)));
